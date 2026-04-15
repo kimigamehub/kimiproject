@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>无尽卡牌 · 遗物秘境</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0a0a1a;
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .stars { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+        .star { position: absolute; width: 2px; height: 2px; background: white; border-radius: 50%; animation: twinkle 3s infinite; }
+        @keyframes twinkle { 0%,100%{ opacity:0.3; } 50%{ opacity:1; } }
+        .game-container { position: relative; z-index: 1; max-width: 100%; min-height: 100vh; display: flex; flex-direction: column; }
+        .top-bar {
+            position: fixed; top: 0; left: 0; right: 0; background: rgba(20,20,40,0.95); backdrop-filter: blur(10px);
+            padding: 8px 12px; display: flex; justify-content: space-between; align-items: center; z-index: 100;
+            border-bottom: 1px solid rgba(255,255,255,0.1); flex-wrap: wrap;
+        }
+        .wave-info { font-size: 0.9rem; color: #ffd700; font-weight: bold; }
+        .mana-display { display: flex; align-items: center; gap: 5px; font-size: 1.1rem; font-weight: bold; }
+        .mana-crystal { width: 24px; height: 24px; background: linear-gradient(135deg, #00d4ff, #0099cc); border-radius: 50%; box-shadow: 0 0 10px #00d4ff; }
+        .relics-bar { display: flex; gap: 5px; margin-left: 10px; font-size: 0.7rem; flex-wrap: wrap; }
+        .relic-icon { background: #2a2a4e; border-radius: 20px; padding: 2px 8px; border: 1px solid #ffd700; color: #ffd700; }
+        .main-content { flex: 1; padding-top: 70px; padding-bottom: 200px; overflow-y: auto; }
+        .character-select { display: none; padding: 15px; }
+        .character-select.active { display: block; }
+        .title { text-align: center; font-size: 1.8rem; margin-bottom: 5px; background: linear-gradient(45deg, #ff6b6b, #ffd93d); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: bold; }
+        .subtitle { text-align: center; color: #888; font-size: 0.85rem; margin-bottom: 15px; }
+        .select-counter { text-align: center; font-size: 1rem; color: #00d4ff; margin-bottom: 15px; font-weight: bold; }
+        .characters-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .character-card {
+            background: linear-gradient(145deg, #1a1a2e, #16213e); border: 2px solid #333; border-radius: 12px;
+            padding: 12px; cursor: pointer; transition: all 0.2s; text-align: center; position: relative;
+        }
+        .character-card:active { transform: scale(0.95); }
+        .character-card.selected {
+            border-color: #ffd700; background: linear-gradient(145deg, #2a2a4e, #1e274e);
+            box-shadow: 0 0 15px rgba(255,215,0,0.3);
+        }
+        .character-card.selected::after {
+            content: '✓'; position: absolute; top: 5px; right: 5px; background: #ffd700; color: #000;
+            width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-weight: bold;
+        }
+        .char-icon { font-size: 2rem; margin-bottom: 5px; }
+        .char-name { font-size: 0.95rem; font-weight: bold; }
+        .char-role { font-size: 0.75rem; color: #888; }
+        .char-stats { font-size: 0.8rem; color: #ff6b6b; }
+        .start-btn {
+            width: 100%; padding: 15px; font-size: 1.2rem; background: linear-gradient(45deg, #ff6b6b, #ff8e53);
+            border: none; border-radius: 25px; color: white; font-weight: bold; cursor: pointer;
+        }
+        .start-btn:disabled { background: #444; opacity: 0.5; }
+        .battle-screen { display: none; padding: 10px; }
+        .battle-screen.active { display: block; }
+        .battlefield { display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px; }
+        .battle-side { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+        .side-label { text-align: center; font-size: 0.8rem; color: #888; margin-bottom: 5px; }
+        .unit {
+            background: linear-gradient(145deg, #1a1a2e, #16213e); border: 2px solid; border-radius: 10px;
+            padding: 8px; width: 100px; text-align: center; position: relative;
+        }
+        .unit.hero { border-color: #00d4ff; }
+        .unit.enemy { border-color: #ff4757; }
+        .unit.dead { opacity: 0.4; filter: grayscale(100%); }
+        .unit.targetable { animation: pulse 1s infinite; box-shadow: 0 0 15px #ff4757; }
+        @keyframes pulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.05); } }
+        .unit-icon { font-size: 1.8rem; margin-bottom: 3px; }
+        .unit-name { font-size: 0.7rem; font-weight: bold; }
+        .hp-bar { height: 6px; background: #333; border-radius: 3px; margin: 4px 0; }
+        .hp-fill { height: 100%; background: linear-gradient(90deg, #ff6b6b, #ee5a24); transition: width 0.3s; }
+        .hp-text { font-size: 0.65rem; color: #ff6b6b; }
+        .unit-effects { display: flex; flex-wrap: wrap; gap: 2px; justify-content: center; min-height: 16px; }
+        .effect-badge { font-size: 0.6rem; padding: 1px 4px; border-radius: 8px; background: rgba(255,255,255,0.1); }
+        .effect-badge.buff { background: rgba(0,212,255,0.3); color: #00d4ff; }
+        .effect-badge.debuff { background: rgba(255,71,87,0.3); color: #ff4757; }
+        .enemy-intent { font-size: 0.65rem; background: #222; border-radius: 12px; padding: 2px 6px; margin-top: 4px; display: inline-block; }
+        .hand-area {
+            position: fixed; bottom: 0; left: 0; right: 0; background: rgba(10,10,26,0.98);
+            border-top: 1px solid rgba(255,255,255,0.1); padding: 10px; z-index: 100; max-height: 210px; overflow-y: auto;
+        }
+        .hand-header { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .end-turn-btn {
+            padding: 6px 16px; background: linear-gradient(45deg, #ff4757, #ff6b81);
+            border: none; border-radius: 20px; color: white; font-weight: bold; cursor: pointer;
+        }
+        .hand-cards { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 5px; }
+        .game-card {
+            flex-shrink: 0; width: 105px; height: 155px; background: linear-gradient(145deg, #2d2d44, #1e1e32);
+            border: 2px solid; border-radius: 10px; padding: 8px; cursor: pointer; position: relative;
+            display: flex; flex-direction: column;
+        }
+        .game-card.攻击 { border-color: #ff6b6b; }
+        .game-card.防御 { border-color: #00d4ff; }
+        .game-card.技能 { border-color: #ffd700; }
+        .game-card.治疗 { border-color: #2ed573; }
+        .game-card.特殊 { border-color: #ff9ff3; }
+        .game-card.事件 { border-color: #9d4edd; background: linear-gradient(145deg, #3a2c5c, #2a1b3d); }
+        .game-card.unplayable { opacity: 0.5; filter: grayscale(0.7); }
+        .card-cost {
+            position: absolute; top: -8px; left: -8px; width: 26px; height: 26px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center; font-weight: bold;
+        }
+        .card-owner { font-size: 0.6rem; color: #aaa; }
+        .card-name { font-size: 0.75rem; font-weight: bold; }
+        .card-type { font-size: 0.55rem; padding: 2px 4px; border-radius: 8px; margin: 3px 0; align-self: flex-start; }
+        .card-type.攻击 { background: rgba(255,107,107,0.3); color: #ff6b6b; }
+        .card-type.防御 { background: rgba(0,212,255,0.3); color: #00d4ff; }
+        .card-type.技能 { background: rgba(255,215,0,0.3); color: #ffd700; }
+        .card-type.治疗 { background: rgba(46,213,115,0.3); color: #2ed573; }
+        .card-type.特殊 { background: rgba(255,159,243,0.3); color: #ff9ff3; }
+        .card-type.事件 { background: rgba(157,78,221,0.3); color: #9d4edd; }
+        .card-desc { font-size: 0.55rem; color: #ccc; line-height: 1.2; }
+        .card-growth { font-size: 0.5rem; color: #2ed573; margin-top: 2px; }
+        .modal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 200; justify-content: center; align-items: center; padding: 20px;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            background: linear-gradient(145deg, #1a1a2e, #16213e); padding: 20px; border-radius: 15px;
+            width: 100%; max-width: 350px; border: 2px solid #ffd700; max-height: 80vh; overflow-y: auto;
+        }
+        .modal-title { font-size: 1.5rem; margin-bottom: 15px; font-weight: bold; text-align: center; }
+        .modal-options { display: flex; flex-direction: column; gap: 10px; }
+        .modal-btn {
+            padding: 12px; background: #2a2a4e; border: 1px solid #00d4ff;
+            border-radius: 30px; color: white; font-weight: bold; cursor: pointer;
+        }
+        .card-select-item {
+            background: #1a1a2e; padding: 10px; border-radius: 8px; margin: 5px 0;
+            cursor: pointer; border: 1px solid #444;
+        }
+        .card-select-item:hover { border-color: #ffd700; }
+        .hint {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: black; padding: 12px 24px; border-radius: 30px; z-index: 150;
+            display: none; border: 1px solid gold;
+        }
+        .hint.active { display: block; }
+        .stat-bonus { font-size: 0.6rem; color: #2ed573; }
+
+        /* ======================
+           🔥 新增：战斗弹跳消息框
+           ====================== */
+        .battle-toast {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            bottom: 250px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 0.8rem;
+            z-index: 300;
+            border: 1px solid #ffd700;
+            white-space: nowrap;
+            animation: bounce 0.5s ease forwards;
+            pointer-events: none;
+            box-shadow: 0 0 10px rgba(255,215,0,0.3);
+        }
+        /* 弹跳核心动画 */
+        @keyframes bounce {
+            0% { opacity: 0; transform: translateX(-50%) scale(0.5) translateY(30px); }
+            60% { opacity: 1; transform: translateX(-50%) scale(1.1) translateY(-8px); }
+            100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
+        }
+        /* 淡出动画 */
+        .battle-toast.fade-out {
+            animation: fadeOut 0.5s ease forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            100% { opacity: 0; transform: translateX(-50%) translateY(15px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    <div class="hint" id="hint">⚔️ 点击敌人选择目标</div>
+    
+    <div class="game-container">
+        <div class="top-bar">
+            <div class="wave-info">🌊 第 <span id="waveNum">1</span> 波</div>
+            <div style="display: flex; align-items: center;">
+                <div class="mana-display">
+                    <div class="mana-crystal"></div>
+                    <span><span id="currentMana">3</span>/<span id="maxMana">3</span></span>
+                </div>
+                <div class="relics-bar" id="relicsBar"></div>
+            </div>
+        </div>
+        
+        <div class="main-content">
+            <div class="character-select active" id="characterSelect">
+                <h1 class="title">🔥 无尽卡牌 🔥</h1>
+                <p class="subtitle">选择3位英雄 · 遗物与成长</p>
+                <p class="select-counter">已选择: <span id="selectedCount">0</span>/3</p>
+                <div class="characters-grid" id="charactersGrid"></div>
+                <button class="start-btn" id="startBtn" disabled>开始冒险</button>
+            </div>
+            
+            <div class="battle-screen" id="battleScreen">
+                <div class="battlefield">
+                    <div><div class="side-label">⚔️ 我方阵营</div><div class="battle-side" id="heroesSide"></div></div>
+                    <div><div class="side-label">👹 敌方阵营</div><div class="battle-side" id="enemiesSide"></div></div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="hand-area" id="handArea" style="display: none;">
+            <div class="hand-header">
+                <span class="hand-title">🎴 手牌 (<span id="handCount">0</span>)</span>
+                <button class="end-turn-btn" id="endTurnBtn">结束回合</button>
+            </div>
+            <div class="hand-cards" id="handCards"></div>
+        </div>
+    </div>
+    
+    <!-- 移除了原固定战斗记录栏 -->
+    
+    <div class="modal" id="campModal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="campTitle">🏕️ 营地休整</h2>
+            <div class="modal-options" id="campOptions"></div>
+        </div>
+    </div>
+    
+    <div class="modal" id="cardSelectModal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="cardSelectTitle">选择卡牌</h2>
+            <div id="cardSelectList"></div>
+            <button class="modal-btn" onclick="document.getElementById('cardSelectModal').classList.remove('active')">取消</button>
+        </div>
+    </div>
+    
+    <div class="modal" id="gameModal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="modalTitle"></h2>
+            <p class="modal-text" id="modalText"></p>
+            <button class="modal-btn" id="modalBtn">重新开始</button>
+        </div>
+    </div>
+
+    <script>
+        (function(){
+            // ==============================================
+            // 🔥 12个原创角色 | 每个角色默认自带1张事件卡
+            // ==============================================
+            const ALL_CHARACTERS = [
+                { id: 'warrior', name: '狂战士', icon: '⚔️', role: '近战爆发', hp: 130, baseAtk: 1.1, baseHeal: 0.7, baseShield: 0.8,
+                  cards: [
+                      { name: '狂怒斩', type: '攻击', cost: 1, baseValue: 14, effect: 'damage', desc: '造成伤害，获得1层狂怒', buff: { type: '狂怒', stacks: 1 } },
+                      { name: '血祭', type: '攻击', cost: 2, baseValue: 28, effect: 'lifesteal', desc: '造成伤害，回复等量生命', healBase: 0 },
+                      { name: '钢铁之躯', type: '防御', cost: 1, baseValue: 12, effect: 'shield', desc: '获得护盾' },
+                      { name: '诸神黄昏', type: '特殊', cost: 3, baseValue: 45, effect: 'damage', desc: '巨额伤害，获得3层狂怒', buff: { type: '狂怒', stacks: 3 } },
+                      { name: '战吼', type: '事件', cost: 1, effect: 'buff_team', desc: '全队攻击+5%', buff:{type:'战吼',stacks:1} }
+                  ] },
+                { id: 'mage_fire', name: '火焰法师', icon: '🔥', role: '法术灼烧', hp: 75, baseAtk: 1.3, baseHeal: 0.6, baseShield: 0.7,
+                  cards: [
+                      { name: '火球', type: '攻击', cost: 1, baseValue: 13, effect: 'damage', desc: '造成伤害，附加2层燃烧', debuff: { type: '燃烧', stacks: 2 } },
+                      { name: '火焰风暴', type: '技能', cost: 2, baseValue: 9, effect: 'aoe', desc: '全体伤害，附加1层燃烧', debuff: { type: '燃烧', stacks: 1 } },
+                      { name: '火焰护盾', type: '防御', cost: 1, baseValue: 8, effect: 'shield_draw', desc: '获得护盾，抽1张牌', draw: 1 },
+                      { name: '熔岩爆裂', type: '特殊', cost: 3, baseValue: 22, effect: 'aoe', desc: '全体巨额伤害' },
+                      { name: '火焰祝福', type: '事件', cost: 1, effect: 'buff_team', desc: '全队伤害+5%', buff:{type:'火焰祝福',stacks:1} }
+                  ] },
+                { id: 'priest', name: '圣光牧师', icon: '✨', role: '治疗辅助', hp: 95, baseAtk: 0.8, baseHeal: 1.4, baseShield: 1.0,
+                  cards: [
+                      { name: '圣光闪耀', type: '治疗', cost: 1, baseValue: 18, effect: 'heal', desc: '单体高额治疗' },
+                      { name: '神恩普照', type: '治疗', cost: 2, baseValue: 12, effect: 'heal_all', desc: '全体治疗' },
+                      { name: '神圣壁垒', type: '防御', cost: 1, baseValue: 22, effect: 'shield', desc: '高额护盾' },
+                      { name: '重生术', type: '特殊', cost: 3, baseValue: 35, effect: 'revive', desc: '复活队友并满生命' },
+                      { name: '神圣祷言', type: '事件', cost: 1, effect: 'heal_team', desc: '全队回复10%生命', healPercent:10 }
+                  ] },
+                { id: 'rogue', name: '暗影刺客', icon: '🥷', role: '连击爆发', hp: 80, baseAtk: 1.2, baseHeal: 0.5, baseShield: 0.6,
+                  cards: [
+                      { name: '连击刺', type: '攻击', cost: 1, baseValue: 11, effect: 'damage', desc: '造成伤害，叠加连击', buff: { type: '连击', stacks: 1 } },
+                      { name: '淬毒', type: '攻击', cost: 1, baseValue: 7, effect: 'damage', desc: '造成伤害，附加4层中毒', debuff: { type: '中毒', stacks: 4 } },
+                      { name: '暗影潜行', type: '技能', cost: 1, effect: 'stealth_mana', desc: '隐身，下回合法力+1', buff: { type: '隐身', stacks: 1 } },
+                      { name: '绝杀', type: '特殊', cost: 2, baseValue: 35, effect: 'damage', desc: '秒杀低血量敌人', debuff: { type: '易伤', stacks: 2 } },
+                      { name: '暗影突袭', type: '事件', cost: 0, effect: 'draw_1', desc: '抽1张牌', draw:1 }
+                  ] },
+                { id: 'paladin', name: '圣骑士', icon: '🛡️', role: '坦克守护', hp: 160, baseAtk: 0.8, baseHeal: 1.1, baseShield: 1.4,
+                  cards: [
+                      { name: '盾猛', type: '攻击', cost: 1, baseValue: 9, effect: 'damage_shield', desc: '伤害+护盾', shieldBase: 12 },
+                      { name: '守护光环', type: '防御', cost: 2, baseValue: 18, effect: 'shield_all', desc: '全体护盾' },
+                      { name: '正义嘲讽', type: '技能', cost: 1, effect: 'taunt', desc: '嘲讽敌人，法力+1', buff: { type: '嘲讽', stacks: 1 } },
+                      { name: '神圣清算', type: '特殊', cost: 3, baseValue: 22, effect: 'damage_heal_all', desc: '伤害+全体治疗', healBase: 18 },
+                      { name: '守护结界', type: '事件', cost: 1, effect: 'shield_team', desc: '全队获得5点护盾', shield:5 }
+                  ] },
+                { id: 'ranger', name: '风行者', icon: '🌪️', role: '远程连击', hp: 90, baseAtk: 1.15, baseHeal: 0.8, baseShield: 0.7,
+                  cards: [
+                      { name: '精准箭', type: '攻击', cost: 1, baseValue: 15, effect: 'damage', desc: '必定暴击', critChance: 1.0 },
+                      { name: '散射箭', type: '攻击', cost: 2, baseValue: 9, effect: 'multi', desc: '随机攻击3次', times: 3 },
+                      { name: '荆棘陷阱', type: '技能', cost: 1, baseValue: 12, effect: 'trap', desc: '敌人攻击时受伤', trapDmg: 12 },
+                      { name: '暴风箭雨', type: '特殊', cost: 3, baseValue: 16, effect: 'aoe', desc: '全体箭雨伤害' },
+                      { name: '风之迅捷', type: '事件', cost: 0, effect: 'extra_mana', desc: '获得1点法力', mana:1 }
+                  ] },
+                { id: 'mage_ice', name: '冰霜法师', icon: '❄️', role: '控制减益', hp: 70, baseAtk: 1.25, baseHeal: 0.6, baseShield: 0.7,
+                  cards: [
+                      { name: '冰锥', type: '攻击', cost: 1, baseValue: 12, effect: 'damage', desc: '造成伤害，附加冻结', debuff: { type: '冻结', stacks: 1 } },
+                      { name: '冰封领域', type: '技能', cost: 2, baseValue: 7, effect: 'aoe', desc: '全体伤害，全体冻结', debuff: { type: '冻结', stacks: 1 } },
+                      { name: '寒冰屏障', type: '防御', cost: 1, baseValue: 10, effect: 'shield', desc: '护盾，免疫伤害1回合' },
+                      { name: '绝对零度', type: '特殊', cost: 3, baseValue: 20, effect: 'aoe', desc: '全体巨额伤害+冻结' },
+                      { name: '冰封祝福', type: '事件', cost: 1, effect: 'debuff_enemy', desc: '全体敌人冻结1层', debuff:{type:'冻结',stacks:1} }
+                  ] },
+                { id: 'druid', name: '德鲁伊', icon: '🌿', role: '召唤愈合', hp: 100, baseAtk: 0.9, baseHeal: 1.3, baseShield: 1.1,
+                  cards: [
+                      { name: '爪击', type: '攻击', cost: 1, baseValue: 13, effect: 'damage', desc: '造成伤害，回复生命' },
+                      { name: '召唤树人', type: '技能', cost: 2, effect: 'summon', desc: '召唤树人伙伴作战' },
+                      { name: '自然愈合', type: '治疗', cost: 1, baseValue: 16, effect: 'heal_all', desc: '全体持续治疗' },
+                      { name: '万物生长', type: '特殊', cost: 3, effect: 'buff_all', desc: '全队属性提升' },
+                      { name: '自然馈赠', type: '事件', cost: 1, effect: 'upgrade_random', desc: '随机升级1张手牌' }
+                  ] },
+                { id: 'necro', name: '死灵法师', icon: '💀', role: '诅咒操控', hp: 75, baseAtk: 1.2, baseHeal: 0.9, baseShield: 0.7,
+                  cards: [
+                      { name: '灵魂抽取', type: '攻击', cost: 1, baseValue: 10, effect: 'lifesteal', desc: '汲取生命', healBase: 5 },
+                      { name: '腐朽诅咒', type: '技能', cost: 2, effect: 'aoe', desc: '全体减攻', debuff: { type: '虚弱', stacks: 2 } },
+                      { name: '亡灵护盾', type: '防御', cost: 1, baseValue: 10, effect: 'shield', desc: '护盾，反弹伤害' },
+                      { name: '亡灵大军', type: '特殊', cost: 3, baseValue: 18, effect: 'aoe', desc: '召唤亡灵群攻击' },
+                      { name: '灵魂汲取', type: '事件', cost: 1, effect: 'lifesteal_all', desc: '全体吸血伤害', baseValue:8 }
+                  ] },
+                { id: 'monk', name: '武僧', icon: '🥋', role: '格挡反击', hp: 110, baseAtk: 1.0, baseHeal: 1.0, baseShield: 1.2,
+                  cards: [
+                      { name: '寸拳', type: '攻击', cost: 1, baseValue: 12, effect: 'damage', desc: '快速拳击' },
+                      { name: '格挡', type: '防御', cost: 1, baseValue: 15, effect: 'shield', desc: '格挡，反弹50%伤害' },
+                      { name: '连环腿', type: '攻击', cost: 2, baseValue: 20, effect: 'multi', desc: '连续攻击2次', times: 2 },
+                      { name: '武神降临', type: '特殊', cost: 3, baseValue: 30, effect: 'damage', desc: '必杀一击' },
+                      { name: '武道心法', type: '事件', cost: 0, effect: 'shield_team', desc: '全队获得3点护盾', shield:3 }
+                  ] },
+                { id: 'hunter', name: '猎人', icon: '🐺', role: '野兽协同', hp: 95, baseAtk: 1.1, baseHeal: 0.8, baseShield: 0.8,
+                  cards: [
+                      { name: '猎鹰突袭', type: '攻击', cost: 1, baseValue: 14, effect: 'damage', desc: '猎鹰攻击' },
+                      { name: '野兽伙伴', type: '技能', cost: 2, effect: 'summon', desc: '召唤战狼' },
+                      { name: '狩猎标记', type: '技能', cost: 1, effect: 'mark', desc: '标记敌人，易伤+暴击', debuff: { type: '易伤', stacks: 1 } },
+                      { name: '百兽奔腾', type: '特殊', cost: 3, baseValue: 25, effect: 'aoe', desc: '野兽群全体攻击' },
+                      { name: '狩猎直觉', type: '事件', cost: 0, effect: 'draw_1', desc: '抽1张牌', draw:1 }
+                  ] },
+                { id: 'mech', name: '机械师', icon: '🤖', role: '炮台构筑', hp: 85, baseAtk: 1.2, baseHeal: 0.7, baseShield: 0.9,
+                  cards: [
+                      { name: '机枪扫射', type: '攻击', cost: 1, baseValue: 12, effect: 'damage', desc: '机械射击' },
+                      { name: '炮台部署', type: '技能', cost: 2, effect: 'summon', desc: '部署自动炮台' },
+                      { name: '能量护盾', type: '防御', cost: 1, baseValue: 14, effect: 'shield', desc: '科技护盾' },
+                      { name: '机甲毁灭', type: '特殊', cost: 3, baseValue: 32, effect: 'damage', desc: '机甲重拳' },
+                      { name: '能量超载', type: '事件', cost: 1, effect: 'extra_mana', desc: '获得2点法力', mana:2 }
+                  ] }
+            ];
+            
+            const EVENT_CARDS = [
+                { name: '命运抉择', type: '事件', cost: 0, effect: 'draw_2', desc: '抽2张牌，舍弃1张', draw:2 },
+                { name: '秘境祝福', type: '事件', cost: 1, effect: 'buff_team', desc: '全队攻击+10%', buff:{type:'祝福',stacks:1} },
+                { name: '时空扭曲', type: '事件', cost: 2, effect: 'extra_mana', desc: '获得2点额外法力', mana:2 },
+                { name: '绝境逢生', type: '事件', cost: 0, effect: 'heal_team', desc: '全队回复15%生命', healPercent:15 },
+                { name: '卡牌精炼', type: '事件', cost: 1, effect: 'upgrade_random', desc: '随机升级1张手牌' },
+                { name: '全域冻结', type: '事件', cost: 2, effect: 'debuff_enemy', desc: '全体敌人冻结2层', debuff:{type:'冻结',stacks:2} },
+                { name: '生命绽放', type: '事件', cost: 1, effect: 'heal_all', desc: '全体回复20生命', baseValue:20 }
+            ];
+
+            const SKILL_CARDS = [
+                { name: '战术撤退', type: '技能', cost: 1, effect: 'shield', desc: '获得10点护盾', baseValue:10 },
+                { name: '集中火力', type: '技能', cost: 1, effect: 'buff_team', desc: '全队暴击+10%', buff:{type:'暴击',stacks:1} },
+                { name: '群体加速', type: '技能', cost: 2, effect: 'draw_2', desc: '抽2张牌', draw:2 },
+                { name: '弱点侦查', type: '技能', cost: 1, effect: 'mark', desc: '敌人易伤+2层', debuff:{type:'易伤',stacks:2} },
+                { name: '应急治疗', type: '技能', cost: 1, effect: 'heal', desc: '回复20生命', baseValue:20 }
+            ];
+            
+            const ENEMY_TYPES = [
+                { name: '史莱姆', icon: '💧', hp: 35, damage: 9 },
+                { name: '哥布林', icon: '👺', hp: 50, damage: 13 },
+                { name: '骷髅战士', icon: '💀', hp: 55, damage: 16 },
+                { name: '兽人勇士', icon: '👹', hp: 75, damage: 19 },
+                { name: '岩石巨人', icon: '🗿', hp: 110, damage: 22 }
+            ];
+            
+            const RELIC_POOL = [
+                { id: 'manaGem', name: '法力水晶', desc: '回合开始时+1法力', effect: (s) => { s.maxMana = Math.min(s.maxMana +1, 8); } },
+                { id: 'powerAmulet', name: '力量护符', desc: '全体攻击力+15%', effect: (s) => { s.heroes.forEach(h => h.atkMult = Math.min((h.atkMult||1.0)*1.15, 3.0)); } },
+                { id: 'vitalityRing', name: '生命戒指', desc: '最大生命值+12%', effect: (s) => { s.heroes.forEach(h => { h.maxHp = Math.floor(h.maxHp*1.12); h.currentHp = Math.min(h.currentHp, h.maxHp); }); } },
+                { id: 'shieldTalisman', name: '护盾符咒', desc: '护盾效果+20%', effect: (s) => { s.heroes.forEach(h => h.shieldMult = Math.min((h.shieldMult||1.0)*1.2, 3.0)); } },
+                { id: 'drawRing', name: '灵感戒指', desc: '每回合多抽1张牌', effect: (s) => { s.drawBonus = Math.min((s.drawBonus||0)+1, 3); } }
+            ];
+            
+            let gameState = {
+                selectedCharacters: [], heroes: [], enemies: [],
+                deck: [], hand: [], discard: [], traps: [],
+                mana: 3, maxMana: 3, wave: 1,
+                relics: [], drawBonus: 0,
+                selectingTarget: null, gameOver: false, inCamp: false
+            };
+
+            // ======================
+            // 🔥 重写：弹跳消息函数
+            // ======================
+            let toastQueue = []; // 消息队列
+            function addLog(msg) {
+                const toast = document.createElement('div');
+                toast.className = 'battle-toast';
+                toast.textContent = msg;
+                document.body.appendChild(toast);
+
+                // 加入队列，自动向上堆叠
+                toastQueue.push(toast);
+                toastQueue.forEach((item, index) => {
+                    item.style.bottom = `${250 + index * 35}px`;
+                });
+
+                // 2秒后淡出并移除
+                setTimeout(() => {
+                    toast.classList.add('fade-out');
+                    setTimeout(() => {
+                        toast.remove();
+                        toastQueue = toastQueue.filter(i => i !== toast);
+                        // 重新排列剩余消息
+                        toastQueue.forEach((item, index) => {
+                            item.style.bottom = `${250 + index * 35}px`;
+                        });
+                    }, 500);
+                }, 2000);
+            }
+            
+            function updateUI() {
+                document.getElementById('waveNum').textContent = gameState.wave;
+                document.getElementById('currentMana').textContent = gameState.mana;
+                document.getElementById('maxMana').textContent = gameState.maxMana;
+                document.getElementById('handCount').textContent = gameState.hand.length;
+                updateRelicsBar();
+                updateBattlefield();
+                updateHand();
+            }
+            
+            function updateRelicsBar() {
+                const bar = document.getElementById('relicsBar');
+                bar.innerHTML = gameState.relics.map(r => `<span class="relic-icon" title="${r.desc}">${r.name}</span>`).join('');
+            }
+            
+            function getHeroMult(hero, type) {
+                if(type==='atk') return hero.atkMult || 1.0;
+                if(type==='heal') return hero.healMult || 1.0;
+                if(type==='shield') return hero.shieldMult || 1.0;
+                return 1.0;
+            }
+            
+            function formatPercent(val) { return Math.round(val*100)+'%'; }
+
+            function addRandomCardToDeck(pool) {
+                const card = {...pool[Math.floor(Math.random()*pool.length)], owner:'秘境', ownerId:'event', upgraded:false, useCount:0, growthBonus:0};
+                gameState.deck.push(card);
+                shuffleDeck();
+                addLog(`🎴 获得新卡牌：${card.name}`);
+            }
+            
+            function initStars() {
+                const container = document.getElementById('stars');
+                for (let i=0;i<40;i++) {
+                    const star = document.createElement('div'); star.className='star';
+                    star.style.left=Math.random()*100+'%'; star.style.top=Math.random()*100+'%';
+                    container.appendChild(star);
+                }
+            }
+            
+            function initCharacterSelect() {
+                const grid = document.getElementById('charactersGrid'); grid.innerHTML = '';
+                ALL_CHARACTERS.forEach(char => {
+                    const card = document.createElement('div'); card.className='character-card'; card.dataset.id=char.id;
+                    card.innerHTML = `<div class="char-icon">${char.icon}</div><div class="char-name">${char.name}</div><div class="char-role">${char.role}</div><div class="char-stats">❤️ ${char.hp}</div>`;
+                    card.addEventListener('click', ()=>toggleCharacter(char.id));
+                    grid.appendChild(card);
+                });
+            }
+            
+            function toggleCharacter(id) {
+                const card = document.querySelector(`.character-card[data-id="${id}"]`);
+                const char = ALL_CHARACTERS.find(c=>c.id===id);
+                if (gameState.selectedCharacters.includes(char)) {
+                    gameState.selectedCharacters = gameState.selectedCharacters.filter(c=>c.id!==id);
+                    card.classList.remove('selected');
+                } else if (gameState.selectedCharacters.length<3) {
+                    gameState.selectedCharacters.push(char);
+                    card.classList.add('selected');
+                }
+                document.getElementById('selectedCount').textContent = gameState.selectedCharacters.length;
+                document.getElementById('startBtn').disabled = gameState.selectedCharacters.length!==3;
+            }
+            
+            function startGame() {
+                gameState.heroes = gameState.selectedCharacters.map((char,i)=>({
+                    ...char, currentHp: char.hp, maxHp: char.hp, shield:0, buffs:[], debuffs:[], dead:false,
+                    atkMult: char.baseAtk, healMult: char.baseHeal, shieldMult: char.baseShield,
+                    kills: 0, trapDmg: 0
+                }));
+                gameState.deck = []; 
+                gameState.heroes.forEach(h => h.cards.forEach(c => gameState.deck.push({
+                    ...c, owner:h.name, ownerId:h.id, upgraded: false, useCount: 0, growthBonus: 0
+                })));
+                shuffleDeck();
+                gameState.relics = []; gameState.maxMana = 3; gameState.drawBonus = 0; gameState.traps = [];
+                spawnEnemies();
+                document.getElementById('characterSelect').classList.remove('active');
+                document.getElementById('battleScreen').classList.add('active');
+                document.getElementById('handArea').style.display='block';
+                startTurn();
+            }
+            
+            function shuffleDeck() { 
+                for(let i=gameState.deck.length-1;i>0;i--){ 
+                    const j=Math.floor(Math.random()*(i+1)); 
+                    [gameState.deck[i],gameState.deck[j]]=[gameState.deck[j],gameState.deck[i]]; 
+                } 
+            }
+            
+            function spawnEnemies() {
+                gameState.enemies = [];
+                const count = Math.min(2+Math.floor(gameState.wave/2), 4);
+                for(let i=0;i<count;i++){
+                    const type = ENEMY_TYPES[Math.min(Math.floor(Math.random()*(gameState.wave+2)), ENEMY_TYPES.length-1)];
+                    const mult = 1 + (gameState.wave-1)*0.12;
+                    const enemy = {
+                        ...type, id:'enemy_'+Date.now()+i, currentHp: Math.floor(type.hp*mult), maxHp: Math.floor(type.hp*mult),
+                        debuffs:[], buffs:[], intent: '攻击', position:i, shield: 0
+                    };
+                    gameState.enemies.push(enemy);
+                }
+                decideEnemyIntents();
+                updateBattlefield();
+            }
+            
+            function decideEnemyIntents() {
+                gameState.enemies.forEach(e => { 
+                    if(e.currentHp>0 && !e.debuffs.some(d=>d.type==='冻结')) {
+                        e.intent = Math.random()<0.7 ? '攻击' : '防御';
+                    } else {
+                        e.intent = '冻结';
+                    }
+                });
+            }
+            
+            function startTurn() {
+                gameState.mana = Math.min(gameState.maxMana, 8);
+                processEffects();
+                const drawCount = Math.min(5 + (gameState.drawBonus || 0), 8);
+                drawCards(drawCount);
+                decideEnemyIntents();
+                updateUI();
+                addLog(`🎴 第${gameState.wave}波 · 抽${drawCount}张牌`);
+            }
+            
+            function drawCards(n) {
+                for(let i=0;i<n;i++){
+                    if(gameState.deck.length===0 && gameState.discard.length>0){ 
+                        gameState.deck=[...gameState.discard]; gameState.discard=[]; shuffleDeck(); 
+                        addLog('🔄 牌库重新洗牌');
+                    }
+                    if(gameState.deck.length>0){ 
+                        const card=gameState.deck.pop(); 
+                        const ownerAlive = gameState.heroes.find(h=>h.id===card.ownerId && !h.dead);
+                        if(ownerAlive) {
+                            gameState.hand.push(card);
+                        } else {
+                            gameState.discard.push(card);
+                        }
+                    }
+                }
+            }
+            
+            function processEffects() {
+                gameState.heroes.forEach(h=>{ 
+                    if(h.dead)return; 
+                    h.buffs=h.buffs.filter(b=>{
+                        if(b.type==='狂怒'||b.type==='连击') return true;
+                        return b.stacks > 0 ? --b.stacks : false;
+                    }); 
+                });
+                
+                gameState.enemies.forEach(e=>{
+                    if(e.currentHp <= 0) return;
+                    if(e.debuffs.some(d=>d.type==='冻结')) {
+                        e.intent = '冻结';
+                        addLog(`❄️ ${e.name} 被冻结，无法行动`);
+                    }
+                    e.debuffs.forEach(d=>{ 
+                        if(d.type==='中毒'){ let dmg= d.stacks*3; e.currentHp-=dmg; addLog(`☠️ ${e.name}中毒-${dmg}`); } 
+                        if(d.type==='燃烧'){ let dmg= d.stacks*2; e.currentHp-=dmg; addLog(`🔥 ${e.name}燃烧-${dmg}`); }
+                    });
+                    e.debuffs = e.debuffs.filter(d=>{ d.stacks--; return d.stacks>0; });
+                });
+                checkDeaths();
+            }
+            
+            function playCard(idx, targetIdx=null){
+                const card = gameState.hand[idx]; 
+                if(gameState.mana<card.cost||gameState.selectingTarget||gameState.gameOver) return;
+                const needsTarget = ['damage','lifesteal','damage_shield','damage_heal_all','mark'].includes(card.effect);
+                if(needsTarget && targetIdx===null && gameState.enemies.some(e=>e.currentHp>0)){ 
+                    startTargetSelection(idx); return; 
+                }
+                executeCard(card, targetIdx);
+                card.useCount = (card.useCount||0) + 1;
+                if(card.useCount % 3 === 0) {
+                    card.growthBonus = Math.min((card.growthBonus||0)+2, 10);
+                    addLog(`📈 ${card.name} 成长！基础值+2`);
+                }
+                gameState.mana -= card.cost;
+                gameState.hand.splice(idx,1); 
+                gameState.discard.push(card);
+                updateUI(); 
+                checkDeaths(); 
+                checkWave();
+            }
+            
+            function startTargetSelection(cardIdx){ 
+                gameState.selectingTarget=cardIdx; 
+                document.getElementById('hint').classList.add('active'); 
+                updateBattlefield();
+            }
+            
+            function selectTarget(enemyIdx){ 
+                const enemy = gameState.enemies[enemyIdx];
+                if(!enemy || enemy.currentHp <= 0) return;
+                document.getElementById('hint').classList.remove('active'); 
+                const cardIdx = gameState.selectingTarget;
+                gameState.selectingTarget = null; 
+                playCard(cardIdx, enemyIdx); 
+            }
+            
+            function executeCard(card, targetIdx){
+                const owner = gameState.heroes.find(h=>h.id===card.ownerId); 
+                if(!owner&&card.type!=='事件')return;
+                let killedEnemy = false;
+                let baseVal = (card.baseValue||0) + (card.growthBonus||0);
+                const atkMult = owner ? Math.min(getHeroMult(owner,'atk'), 3.0) : 1.0;
+                const healMult = owner ? Math.min(getHeroMult(owner,'heal'), 3.0) : 1.0;
+                const shieldMult = owner ? Math.min(getHeroMult(owner,'shield'), 3.0) : 1.0;
+                const upgradeMult = card.upgraded ? 1.3 : 1.0;
+                
+                const applyDamage = (enemy, rawValue) => {
+                    if(!enemy || enemy.currentHp <= 0) return 0;
+                    let dmg = Math.floor(rawValue * atkMult * upgradeMult);
+                    if(card.critChance && Math.random()<card.critChance) { dmg *= 2; addLog('💥 暴击！'); }
+                    const vulnerable = enemy.debuffs?.find(d=>d.type==='易伤');
+                    if(vulnerable) dmg = Math.floor(dmg * 1.5);
+                    if(enemy.shield > 0) {
+                        let absorb = Math.min(enemy.shield, dmg);
+                        enemy.shield -= absorb;
+                        dmg -= absorb;
+                    }
+                    if(dmg > 0) enemy.currentHp -= dmg;
+                    if(enemy.currentHp <= 0) killedEnemy = true;
+                    return dmg;
+                };
+                
+                if(card.effect === 'damage' && targetIdx != null) {
+                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                    if(d > 0) addLog(`${owner.name} 使用 ${card.name} 造成 ${d} 伤害`);
+                }
+                else if(card.effect === 'lifesteal' && targetIdx != null) {
+                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                    let heal = card.healBase ? Math.floor(card.healBase*healMult*upgradeMult) : Math.floor(d*0.5);
+                    owner.currentHp = Math.min(owner.currentHp + heal, owner.maxHp);
+                    addLog(`${owner.name} 汲取 ${d} 伤害，回复 ${heal} 生命`);
+                }
+                else if(card.effect === 'shield') {
+                    let s = Math.floor(baseVal * shieldMult * upgradeMult);
+                    owner.shield = Math.min(owner.shield + s, owner.maxHp);
+                    addLog(`${owner.name} 获得 ${s} 护盾`);
+                }
+                else if(card.effect === 'shield_all') {
+                    let s = Math.floor(baseVal * shieldMult * upgradeMult);
+                    gameState.heroes.forEach(h => { if(!h.dead) h.shield = Math.min(h.shield+s, h.maxHp); });
+                    addLog(`全体获得 ${s} 护盾`);
+                }
+                else if(card.effect === 'heal') {
+                    let h = Math.floor(baseVal * healMult * upgradeMult);
+                    owner.currentHp = Math.min(owner.currentHp + h, owner.maxHp);
+                    addLog(`${owner.name} 回复 ${h} 生命`);
+                }
+                else if(card.effect === 'heal_all') {
+                    let h = Math.floor(baseVal * healMult * upgradeMult);
+                    gameState.heroes.forEach(hero => { if(!hero.dead) hero.currentHp = Math.min(hero.currentHp+h, hero.maxHp); });
+                    addLog(`全体回复 ${h} 生命`);
+                }
+                else if(card.effect === 'aoe') {
+                    gameState.enemies.forEach(e => { 
+                        if(e.currentHp>0) { 
+                            let d = applyDamage(e, baseVal); 
+                            if(d>0) addLog(`${e.name} 受到 ${d} 伤害`); 
+                        } 
+                    });
+                }
+                else if(card.effect === 'damage_shield' && targetIdx != null) {
+                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                    let s = Math.floor((card.shieldBase||0) * shieldMult * upgradeMult);
+                    owner.shield = Math.min(owner.shield+s, owner.maxHp);
+                    addLog(`造成 ${d} 伤害，获得 ${s} 护盾`);
+                }
+                else if(card.effect === 'damage_heal_all' && targetIdx != null) {
+                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                    let h = Math.floor((card.healBase||0) * healMult * upgradeMult);
+                    gameState.heroes.forEach(hero => { if(!hero.dead) hero.currentHp = Math.min(hero.currentHp+h, hero.maxHp); });
+                    addLog(`造成 ${d} 伤害，全体回复 ${h}`);
+                }
+                else if(card.effect === 'multi') {
+                    for(let i=0; i<(card.times||2); i++) {
+                        let alive = gameState.enemies.filter(e=>e.currentHp>0);
+                        if(alive.length) {
+                            let t = alive[Math.floor(Math.random()*alive.length)];
+                            let d = applyDamage(t, baseVal);
+                            if(d>0) addLog(`击中 ${t.name} 造成 ${d} 伤害`);
+                        }
+                    }
+                }
+                else if(card.effect === 'revive') {
+                    let deadHero = gameState.heroes.find(h=>h.dead);
+                    if(deadHero) {
+                        deadHero.dead = false;
+                        deadHero.currentHp = deadHero.maxHp;
+                        deadHero.shield = 0;
+                        addLog(`✨ ${deadHero.name} 复活！`);
+                    }
+                }
+                else if(card.effect === 'stealth_mana') {
+                    owner.buffs.push({type:'隐身', stacks:1});
+                    gameState.maxMana = Math.min(gameState.maxMana+1, 8);
+                    addLog(`${owner.name} 隐身，法力+1`);
+                }
+                else if(card.effect === 'taunt') {
+                    owner.buffs.push({type:'嘲讽', stacks:1});
+                    gameState.maxMana = Math.min(gameState.maxMana+1, 8);
+                    addLog(`${owner.name} 嘲讽敌人，法力+1`);
+                }
+                else if(card.effect === 'trap') {
+                    owner.trapDmg = card.trapDmg || 10;
+                    gameState.traps.push(owner);
+                    addLog(`🎯 布置陷阱！敌人攻击时受到 ${owner.trapDmg} 伤害`);
+                }
+                if(card.draw) {
+                    drawCards(card.draw);
+                    addLog(`🃏 抽 ${card.draw} 张牌`);
+                }
+                
+                if(card.effect === 'draw_1') drawCards(1);
+                if(card.effect === 'draw_2') drawCards(2);
+                if(card.effect === 'extra_mana') {
+                    gameState.mana += card.mana||1;
+                    addLog(`🔮 获得 ${card.mana||1} 点法力`);
+                }
+                if(card.effect === 'heal_team') {
+                    gameState.heroes.forEach(h=>{
+                        if(!h.dead) {
+                            let heal = Math.floor(h.maxHp * (card.healPercent||10)/100);
+                            h.currentHp = Math.min(h.currentHp+heal, h.maxHp);
+                        }
+                    });
+                    addLog(`❤️ 全队回复 ${card.healPercent||10}% 生命`);
+                }
+                if(card.effect === 'shield_team') {
+                    let s = card.shield||5;
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.shield = Math.min(h.shield+s, h.maxHp); });
+                    addLog(`🛡️ 全队获得 ${s} 护盾`);
+                }
+                if(card.effect === 'buff_team') {
+                    gameState.heroes.forEach(h=>{
+                        if(!h.dead) h.atkMult = Math.min((h.atkMult||1)*1.05, 3.0);
+                    });
+                    addLog(`💪 全队攻击提升！`);
+                }
+                if(card.effect === 'debuff_enemy') {
+                    gameState.enemies.forEach(e=>{
+                        if(e.currentHp>0) e.debuffs.push({...card.debuff});
+                    });
+                    addLog(`❄️ 全体敌人附加 ${card.debuff.type}！`);
+                }
+                if(card.effect === 'upgrade_random') {
+                    if(gameState.hand.length>0) {
+                        let randCard = gameState.hand[Math.floor(Math.random()*gameState.hand.length)];
+                        randCard.upgraded = true;
+                        if(!randCard.name.includes('+')) randCard.name += '+';
+                        addLog(`✨ 随机升级：${randCard.name}`);
+                    }
+                }
+                if(card.effect === 'lifesteal_all') {
+                    let totalDmg = 0;
+                    gameState.enemies.forEach(e=>{
+                        if(e.currentHp>0) totalDmg += applyDamage(e, baseVal);
+                    });
+                    let heal = Math.floor(totalDmg*0.3);
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.currentHp = Math.min(h.currentHp+heal, h.maxHp); });
+                    addLog(`💀 全体吸血，回复 ${heal} 生命`);
+                }
+                
+                if(card.buff && owner) {
+                    let exist = owner.buffs.find(b=>b.type===card.buff.type);
+                    if(exist) exist.stacks += card.buff.stacks;
+                    else owner.buffs.push({...card.buff, stacks: card.buff.stacks||1});
+                }
+                if(card.debuff && targetIdx!=null) {
+                    let enemy = gameState.enemies[targetIdx];
+                    if(enemy && enemy.currentHp > 0){
+                        let exist = enemy.debuffs.find(d=>d.type===card.debuff.type);
+                        if(exist) exist.stacks += card.debuff.stacks;
+                        else enemy.debuffs.push({...card.debuff, stacks: card.debuff.stacks||1});
+                    }
+                }
+                
+                if(killedEnemy && owner) {
+                    owner.kills = (owner.kills||0) + 1;
+                    owner.atkMult = Math.min((owner.atkMult||1)*1.02, 3.0);
+                    owner.maxHp += 2;
+                    owner.currentHp = Math.min(owner.currentHp+2, owner.maxHp);
+                    addLog(`⚡ ${owner.name} 成长！攻击+2% 生命+2`);
+                }
+                checkDeaths();
+            }
+            
+            function enemyTurn(){
+                addLog('👹 敌人回合');
+                gameState.enemies.forEach(e=>{
+                    if(e.currentHp<=0||e.debuffs.some(d=>d.type==='冻结'))return;
+                    
+                    if(gameState.traps.length>0 && e.intent==='攻击'){
+                        gameState.traps.forEach(t=>{
+                            let dmg = t.trapDmg;
+                            e.currentHp -= dmg;
+                            addLog(`🎯 陷阱触发！${e.name} 受到 ${dmg} 伤害`);
+                        });
+                        gameState.traps = [];
+                    }
+                    
+                    if(e.intent === '攻击'){
+                        let targets = gameState.heroes.filter(h=>!h.dead && !h.buffs.some(b=>b.type==='隐身'));
+                        if(targets.length===0) targets = gameState.heroes.filter(h=>!h.dead);
+                        if(targets.length===0) return;
+                        
+                        let tauntTarget = targets.find(h=>h.buffs.some(b=>b.type==='嘲讽'));
+                        let target = tauntTarget || targets[Math.floor(Math.random()*targets.length)];
+                        
+                        if(target){ 
+                            let dmg = Math.floor(e.damage * (1+(gameState.wave-1)*0.1)); 
+                            if(target.shield>0){ let absorb=Math.min(target.shield,dmg); target.shield-=absorb; dmg-=absorb; } 
+                            if(dmg>0) target.currentHp-=dmg; 
+                            addLog(`${e.name} 攻击 ${target.name} 造成 ${dmg} 伤害`); 
+                        }
+                    } else { 
+                        let shieldGain = Math.min(10 + gameState.wave, 30);
+                        e.shield = Math.min((e.shield||0)+shieldGain, e.maxHp); 
+                        addLog(`${e.name} 防御，获得 ${shieldGain} 护盾`); 
+                    }
+                });
+                checkDeaths();
+                if(!gameState.gameOver) startTurn();
+            }
+            
+            function checkDeaths(){
+                gameState.heroes.forEach(h=>{ if(h.currentHp<=0&&!h.dead){ h.dead=true; h.currentHp=0; addLog(`💀 ${h.name} 阵亡！`); } });
+                gameState.enemies = gameState.enemies.filter(e => e.currentHp > 0);
+                if(gameState.heroes.every(h=>h.dead)) gameOver(false);
+                updateBattlefield();
+            }
+            
+            function checkWave(){
+                if(gameState.enemies.length === 0){
+                    gameState.wave++;
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.currentHp=Math.min(h.currentHp+15, h.maxHp); });
+                    addLog(`🎉 第${gameState.wave-1}波胜利！进入营地`);
+                    showCamp();
+                }
+            }
+            
+            function showCamp(){
+                gameState.inCamp = true;
+                const modal = document.getElementById('campModal'); 
+                const opts = document.getElementById('campOptions');
+                opts.innerHTML = '';
+                
+                const addBtn = (text, action) => { 
+                    const b=document.createElement('button'); 
+                    b.className='modal-btn'; 
+                    b.textContent=text; 
+                    b.onclick=action; 
+                    opts.appendChild(b); 
+                };
+                
+                addBtn('⬆️ 升级卡牌 (+30%效果)', ()=> showCardSelect('upgrade'));
+                addBtn('🗑️ 移除卡牌', ()=> showCardSelect('remove'));
+                addBtn('🎁 随机遗物', ()=>{ 
+                    const r=RELIC_POOL[Math.floor(Math.random()*RELIC_POOL.length)]; 
+                    gameState.relics.push({...r}); 
+                    r.effect(gameState); 
+                    addLog(`📿 获得: ${r.name}`);
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                addBtn('🎴 获得普通技能卡', ()=>{ 
+                    addRandomCardToDeck(SKILL_CARDS);
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                addBtn('🔮 获得随机事件卡', ()=>{ 
+                    addRandomCardToDeck(EVENT_CARDS);
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                
+                addBtn('💪 全队攻击+8%', ()=>{ 
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.atkMult=Math.min((h.atkMult||1)*1.08,3.0); }); 
+                    addLog(`💪 全队攻击+8%`);
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                addBtn('❤️ 全队生命+10%', ()=>{ 
+                    gameState.heroes.forEach(h=>{ if(!h.dead) { h.maxHp=Math.floor(h.maxHp*1.1); h.currentHp=Math.min(h.currentHp, h.maxHp); } }); 
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                addBtn('🛡️ 全队护盾+12%', ()=>{ 
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.shieldMult=Math.min((h.shieldMult||1)*1.12,3.0); }); 
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                addBtn('🎴 抽牌数+1', ()=>{ 
+                    gameState.drawBonus = Math.min((gameState.drawBonus||0)+1,3); 
+                    addLog(`🎴 每回合多抽1张`);
+                    modal.classList.remove('active'); 
+                    proceedAfterCamp(); 
+                });
+                
+                modal.classList.add('active');
+            }
+            
+            function showCardSelect(action) {
+                const allCards = [...gameState.deck, ...gameState.hand, ...gameState.discard];
+                const uniqueCards = [];
+                const seen = new Set();
+                allCards.forEach(c => {
+                    const key = c.ownerId + c.name;
+                    if(!seen.has(key)) { seen.add(key); uniqueCards.push(c); }
+                });
+                
+                const modal = document.getElementById('cardSelectModal');
+                const title = document.getElementById('cardSelectTitle');
+                const listDiv = document.getElementById('cardSelectList');
+                title.textContent = action === 'upgrade' ? '升级卡牌' : '移除卡牌';
+                listDiv.innerHTML = '';
+                
+                if(uniqueCards.length === 0) {
+                    listDiv.innerHTML = '<p style="color:#888">无可用卡牌</p>';
+                } else {
+                    uniqueCards.slice(0, 6).forEach(card => {
+                        const item = document.createElement('div');
+                        item.className = 'card-select-item';
+                        item.innerHTML = `<strong>${card.name}</strong> (${card.owner})<br><small>${card.desc||''} 基础:${card.baseValue||0}${card.growthBonus?` +${card.growthBonus}`:''}</small>`;
+                        item.onclick = () => {
+                            if(action === 'upgrade') {
+                                card.upgraded = true;
+                                if(!card.name.includes('+')) card.name += '+';
+                                addLog(`✨ ${card.name} 升级！`);
+                            } else {
+                                gameState.deck = gameState.deck.filter(c => c !== card);
+                                gameState.hand = gameState.hand.filter(c => c !== card);
+                                gameState.discard = gameState.discard.filter(c => c !== card);
+                                addLog(`🗑️ 移除 ${card.name}`);
+                            }
+                            modal.classList.remove('active');
+                            document.getElementById('campModal').classList.remove('active');
+                            proceedAfterCamp();
+                        };
+                        listDiv.appendChild(item);
+                    });
+                }
+                modal.classList.add('active');
+            }
+            
+            function proceedAfterCamp(){
+                gameState.inCamp=false;
+                spawnEnemies();
+                gameState.deck=[...gameState.deck,...gameState.discard,...gameState.hand]; 
+                gameState.discard=[]; gameState.hand=[];
+                shuffleDeck(); 
+                startTurn();
+            }
+            
+            function gameOver(win){
+                gameState.gameOver=true;
+                const modal=document.getElementById('gameModal'); 
+                document.getElementById('modalTitle').textContent=win?'🎉 胜利':'💀 失败';
+                document.getElementById('modalText').textContent=win?'你征服了秘境！':'队伍覆灭...';
+                modal.classList.add('active');
+            }
+            
+            function updateBattlefield(){
+                const hDiv=document.getElementById('heroesSide'); hDiv.innerHTML='';
+                gameState.heroes.forEach(h=>{
+                    const d=document.createElement('div'); d.className=`unit hero ${h.dead?'dead':''}`;
+                    d.innerHTML=`<div class="unit-icon">${h.icon}</div><div class="unit-name">${h.name}</div>
+                        <div class="hp-bar"><div class="hp-fill" style="width:${(h.currentHp/h.maxHp)*100}%"></div></div>
+                        <div class="hp-text">${h.currentHp}/${h.maxHp}${h.shield>0?`+${h.shield}`:''}</div>
+                        <div class="stat-bonus">⚔️${formatPercent(h.atkMult)} 💚${formatPercent(h.healMult)} 🛡️${formatPercent(h.shieldMult)}</div>
+                        <div class="stat-bonus">🏆击杀:${h.kills||0}</div>
+                        <div class="unit-effects">${h.buffs.map(b=>`<span class="effect-badge buff">${b.type}${b.stacks>1?b.stacks:''}</span>`).join('')}</div>`;
+                    hDiv.appendChild(d);
+                });
+                const eDiv=document.getElementById('enemiesSide'); eDiv.innerHTML='';
+                gameState.enemies.forEach((e,i)=>{
+                    const d=document.createElement('div'); d.className=`unit enemy ${e.currentHp<=0?'dead':''}`;
+                    const intentTxt = e.intent==='攻击'?'⚔️攻击':e.intent==='冻结'?'❄️冻结':'🛡️防御';
+                    d.innerHTML=`<div class="unit-icon">${e.icon}</div><div class="unit-name">${e.name}</div>
+                        <div class="hp-bar"><div class="hp-fill" style="width:${(e.currentHp/e.maxHp)*100}%"></div></div>
+                        <div class="hp-text">${e.currentHp}/${e.maxHp}${e.shield>0?`+${e.shield}`:''}</div>
+                        <div class="enemy-intent">${intentTxt}</div>
+                        <div class="unit-effects">${e.debuffs.map(d=>`<span class="effect-badge debuff">${d.type}${d.stacks>1?d.stacks:''}</span>`).join('')}</div>`;
+                    if(e.currentHp>0 && gameState.selectingTarget!==null) {
+                        d.classList.add('targetable');
+                        d.onclick=()=>selectTarget(i);
+                    }
+                    eDiv.appendChild(d);
+                });
+            }
+            
+            function updateHand(){
+                const c=document.getElementById('handCards'); c.innerHTML='';
+                gameState.hand.forEach((card,i)=>{
+                    const div=document.createElement('div'); 
+                    const unplayable=gameState.mana<card.cost||gameState.selectingTarget!==null;
+                    div.className=`game-card ${card.type} ${unplayable?'unplayable':''}`;
+                    const totalBase = (card.baseValue||0) + (card.growthBonus||0);
+                    let desc = card.desc || '';
+                    if(card.baseValue) desc += ` ${totalBase}`;
+                    if(card.upgraded) desc += ' ⬆️';
+                    div.innerHTML=`<div class="card-cost">${card.cost}</div>
+                        <div class="card-owner">${card.owner}</div>
+                        <div class="card-name">${card.name}</div>
+                        <span class="card-type ${card.type}">${card.type}</span>
+                        <div class="card-desc">${desc}</div>
+                        <div class="card-growth">📊使用${card.useCount||0}次 ${card.growthBonus?`+${card.growthBonus}`:''}</div>`;
+                    if(!unplayable) div.addEventListener('click', ()=>playCard(i));
+                    c.appendChild(div);
+                });
+            }
+            
+            function endTurn(){ 
+                if(gameState.selectingTarget) {
+                    document.getElementById('hint').classList.remove('active');
+                    gameState.selectingTarget=null;
+                }
+                gameState.discard.push(...gameState.hand); 
+                gameState.hand=[]; 
+                updateUI(); 
+                enemyTurn(); 
+            }
+            
+            document.getElementById('startBtn').addEventListener('click', startGame);
+            document.getElementById('endTurnBtn').addEventListener('click', endTurn);
+            document.getElementById('modalBtn').addEventListener('click', ()=>location.reload());
+            
+            initStars(); 
+            initCharacterSelect();
+        })();
+    </script>
+</body>
+</html>
