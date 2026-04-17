@@ -75,7 +75,7 @@
         .unit.hero { border-color: #00d4ff; }
         .unit.enemy { border-color: #ff4757; }
         .unit.dead { opacity: 0.4; filter: grayscale(100%); }
-        .unit.targetable { animation: pulse 1s infinite; box-shadow: 0 0 15px #ff4757; }
+        .unit.targetable { animation: pulse 1s infinite; box-shadow: 0 0 15px #ffd700; }  /* 治疗目标也高亮 */
         @keyframes pulse { 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.05); } }
         .unit-icon { font-size: 1.8rem; margin-bottom: 3px; }
         .unit-name { font-size: 0.7rem; font-weight: bold; }
@@ -153,9 +153,7 @@
         .hint.active { display: block; }
         .stat-bonus { font-size: 0.6rem; color: #2ed573; }
 
-        /* ======================
-           🔥 新增：战斗弹跳消息框
-           ====================== */
+        /* 战斗弹跳消息框 */
         .battle-toast {
             position: fixed;
             left: 50%;
@@ -173,13 +171,11 @@
             pointer-events: none;
             box-shadow: 0 0 10px rgba(255,215,0,0.3);
         }
-        /* 弹跳核心动画 */
         @keyframes bounce {
             0% { opacity: 0; transform: translateX(-50%) scale(0.5) translateY(30px); }
             60% { opacity: 1; transform: translateX(-50%) scale(1.1) translateY(-8px); }
             100% { opacity: 1; transform: translateX(-50%) scale(1) translateY(0); }
         }
-        /* 淡出动画 */
         .battle-toast.fade-out {
             animation: fadeOut 0.5s ease forwards;
         }
@@ -191,7 +187,7 @@
 </head>
 <body>
     <div class="stars" id="stars"></div>
-    <div class="hint" id="hint">⚔️ 点击敌人选择目标</div>
+    <div class="hint" id="hint">⚔️ 点击选择目标</div>
     
     <div class="game-container">
         <div class="top-bar">
@@ -230,8 +226,6 @@
             <div class="hand-cards" id="handCards"></div>
         </div>
     </div>
-    
-    <!-- 移除了原固定战斗记录栏 -->
     
     <div class="modal" id="campModal">
         <div class="modal-content">
@@ -375,7 +369,7 @@
                 { name: '集中火力', type: '技能', cost: 1, effect: 'buff_team', desc: '全队暴击+10%', buff:{type:'暴击',stacks:1} },
                 { name: '群体加速', type: '技能', cost: 2, effect: 'draw_2', desc: '抽2张牌', draw:2 },
                 { name: '弱点侦查', type: '技能', cost: 1, effect: 'mark', desc: '敌人易伤+2层', debuff:{type:'易伤',stacks:2} },
-                { name: '应急治疗', type: '技能', cost: 1, effect: 'heal', desc: '回复20生命', baseValue:20 }
+                { name: '应急治疗', type: '治疗', cost: 1, effect: 'heal', desc: '回复20生命', baseValue:20 }
             ];
             
             const ENEMY_TYPES = [
@@ -399,35 +393,26 @@
                 deck: [], hand: [], discard: [], traps: [],
                 mana: 3, maxMana: 3, wave: 1,
                 relics: [], drawBonus: 0,
-                selectingTarget: null, gameOver: false, inCamp: false
+                selectingTarget: null, gameOver: false, inCamp: false,
+                // 新增目标选择类型 'enemy' 或 'ally'
+                targetType: null,
+                selectedCardIdx: -1
             };
 
-            // ======================
-            // 🔥 重写：弹跳消息函数
-            // ======================
-            let toastQueue = []; // 消息队列
+            let toastQueue = [];
             function addLog(msg) {
                 const toast = document.createElement('div');
                 toast.className = 'battle-toast';
                 toast.textContent = msg;
                 document.body.appendChild(toast);
-
-                // 加入队列，自动向上堆叠
                 toastQueue.push(toast);
-                toastQueue.forEach((item, index) => {
-                    item.style.bottom = `${250 + index * 35}px`;
-                });
-
-                // 2秒后淡出并移除
+                toastQueue.forEach((item, index) => { item.style.bottom = `${250 + index * 35}px`; });
                 setTimeout(() => {
                     toast.classList.add('fade-out');
                     setTimeout(() => {
                         toast.remove();
                         toastQueue = toastQueue.filter(i => i !== toast);
-                        // 重新排列剩余消息
-                        toastQueue.forEach((item, index) => {
-                            item.style.bottom = `${250 + index * 35}px`;
-                        });
+                        toastQueue.forEach((item, index) => { item.style.bottom = `${250 + index * 35}px`; });
                     }, 500);
                 }, 2000);
             }
@@ -600,45 +585,92 @@
                 checkDeaths();
             }
             
-            function playCard(idx, targetIdx=null){
-                const card = gameState.hand[idx]; 
-                if(gameState.mana<card.cost||gameState.selectingTarget||gameState.gameOver) return;
-                const needsTarget = ['damage','lifesteal','damage_shield','damage_heal_all','mark'].includes(card.effect);
-                if(needsTarget && targetIdx===null && gameState.enemies.some(e=>e.currentHp>0)){ 
-                    startTargetSelection(idx); return; 
-                }
-                executeCard(card, targetIdx);
+            // ========== 核心改动：目标选择系统 ==========
+            function startTargetSelection(cardIdx, targetType) {
+                gameState.selectingTarget = true;
+                gameState.targetType = targetType;
+                gameState.selectedCardIdx = cardIdx;
+                const hint = document.getElementById('hint');
+                hint.textContent = targetType === 'enemy' ? '⚔️ 点击敌人选择目标' : '💚 点击友方选择治疗目标';
+                hint.classList.add('active');
+                updateBattlefield();
+            }
+
+            function clearTargetSelection() {
+                gameState.selectingTarget = false;
+                gameState.targetType = null;
+                gameState.selectedCardIdx = -1;
+                document.getElementById('hint').classList.remove('active');
+                updateBattlefield();
+            }
+
+            // 选择敌方目标
+            function selectEnemyTarget(enemyIdx) {
+                const enemy = gameState.enemies[enemyIdx];
+                if (!enemy || enemy.currentHp <= 0) return;
+                const cardIdx = gameState.selectedCardIdx;
+                clearTargetSelection();
+                commitCardPlay(cardIdx, enemyIdx, null);
+            }
+
+            // 选择友方目标（治疗）
+            function selectAllyTarget(allyIdx) {
+                const ally = gameState.heroes[allyIdx];
+                if (!ally || ally.dead) return;
+                const cardIdx = gameState.selectedCardIdx;
+                clearTargetSelection();
+                commitCardPlay(cardIdx, null, allyIdx);
+            }
+
+            // 执行卡牌效果并扣除费用、移入手牌等
+            function commitCardPlay(cardIdx, enemyTargetIdx, allyTargetIdx) {
+                const card = gameState.hand[cardIdx];
+                if (!card) return;
+                const owner = gameState.heroes.find(h => h.id === card.ownerId);
+                if (!owner && card.type !== '事件') return;
+                
+                // 执行效果
+                executeCard(card, enemyTargetIdx, allyTargetIdx);
+                
+                // 成长计数
                 card.useCount = (card.useCount||0) + 1;
                 if(card.useCount % 3 === 0) {
                     card.growthBonus = Math.min((card.growthBonus||0)+2, 10);
                     addLog(`📈 ${card.name} 成长！基础值+2`);
                 }
                 gameState.mana -= card.cost;
-                gameState.hand.splice(idx,1); 
+                gameState.hand.splice(cardIdx, 1);
                 gameState.discard.push(card);
-                updateUI(); 
-                checkDeaths(); 
+                updateUI();
+                checkDeaths();
                 checkWave();
             }
-            
-            function startTargetSelection(cardIdx){ 
-                gameState.selectingTarget=cardIdx; 
-                document.getElementById('hint').classList.add('active'); 
-                updateBattlefield();
+
+            // 玩家点击手牌
+            function playCard(idx) {
+                if (gameState.mana < gameState.hand[idx].cost || gameState.selectingTarget || gameState.gameOver) return;
+                const card = gameState.hand[idx];
+                
+                // 需要敌方目标的效果（吸血、伤害等）
+                const needsEnemyTarget = ['damage','lifesteal','damage_shield','damage_heal_all','mark'].includes(card.effect);
+                // 需要友方目标的效果（单体治疗）
+                const needsAllyTarget = card.effect === 'heal';
+                
+                if (needsEnemyTarget && gameState.enemies.some(e=>e.currentHp>0)) {
+                    startTargetSelection(idx, 'enemy');
+                    return;
+                }
+                if (needsAllyTarget && gameState.heroes.some(h=>!h.dead)) {
+                    startTargetSelection(idx, 'ally');
+                    return;
+                }
+                // 无需目标，直接执行
+                commitCardPlay(idx, null, null);
             }
             
-            function selectTarget(enemyIdx){ 
-                const enemy = gameState.enemies[enemyIdx];
-                if(!enemy || enemy.currentHp <= 0) return;
-                document.getElementById('hint').classList.remove('active'); 
-                const cardIdx = gameState.selectingTarget;
-                gameState.selectingTarget = null; 
-                playCard(cardIdx, enemyIdx); 
-            }
-            
-            function executeCard(card, targetIdx){
+            function executeCard(card, enemyTargetIdx, allyTargetIdx){
                 const owner = gameState.heroes.find(h=>h.id===card.ownerId); 
-                if(!owner&&card.type!=='事件')return;
+                if(!owner && card.type!=='事件') return;
                 let killedEnemy = false;
                 let baseVal = (card.baseValue||0) + (card.growthBonus||0);
                 const atkMult = owner ? Math.min(getHeroMult(owner,'atk'), 3.0) : 1.0;
@@ -662,16 +694,47 @@
                     return dmg;
                 };
                 
-                if(card.effect === 'damage' && targetIdx != null) {
-                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                // 敌方目标效果
+                if(card.effect === 'damage' && enemyTargetIdx != null) {
+                    let d = applyDamage(gameState.enemies[enemyTargetIdx], baseVal);
                     if(d > 0) addLog(`${owner.name} 使用 ${card.name} 造成 ${d} 伤害`);
                 }
-                else if(card.effect === 'lifesteal' && targetIdx != null) {
-                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
+                else if(card.effect === 'lifesteal' && enemyTargetIdx != null) {
+                    let d = applyDamage(gameState.enemies[enemyTargetIdx], baseVal);
                     let heal = card.healBase ? Math.floor(card.healBase*healMult*upgradeMult) : Math.floor(d*0.5);
                     owner.currentHp = Math.min(owner.currentHp + heal, owner.maxHp);
                     addLog(`${owner.name} 汲取 ${d} 伤害，回复 ${heal} 生命`);
                 }
+                else if(card.effect === 'damage_shield' && enemyTargetIdx != null) {
+                    let d = applyDamage(gameState.enemies[enemyTargetIdx], baseVal);
+                    let s = Math.floor((card.shieldBase||0) * shieldMult * upgradeMult);
+                    owner.shield = Math.min(owner.shield+s, owner.maxHp);
+                    addLog(`造成 ${d} 伤害，获得 ${s} 护盾`);
+                }
+                else if(card.effect === 'damage_heal_all' && enemyTargetIdx != null) {
+                    let d = applyDamage(gameState.enemies[enemyTargetIdx], baseVal);
+                    let h = Math.floor((card.healBase||0) * healMult * upgradeMult);
+                    gameState.heroes.forEach(hero => { if(!hero.dead) hero.currentHp = Math.min(hero.currentHp+h, hero.maxHp); });
+                    addLog(`造成 ${d} 伤害，全体回复 ${h}`);
+                }
+                else if(card.effect === 'mark' && enemyTargetIdx != null) {
+                    let enemy = gameState.enemies[enemyTargetIdx];
+                    if(enemy) {
+                        let exist = enemy.debuffs.find(d=>d.type==='易伤');
+                        if(exist) exist.stacks += (card.debuff?.stacks||1);
+                        else enemy.debuffs.push({type:'易伤', stacks: card.debuff?.stacks||1});
+                        addLog(`🎯 ${enemy.name} 被标记易伤`);
+                    }
+                }
+                // ===== 单体治疗 (选中友方目标) =====
+                else if(card.effect === 'heal') {
+                    let targetHero = (allyTargetIdx !== null && gameState.heroes[allyTargetIdx] && !gameState.heroes[allyTargetIdx].dead) 
+                                    ? gameState.heroes[allyTargetIdx] : owner;
+                    let h = Math.floor(baseVal * healMult * upgradeMult);
+                    targetHero.currentHp = Math.min(targetHero.currentHp + h, targetHero.maxHp);
+                    addLog(`${owner.name} 治疗 ${targetHero.name} 回复 ${h} 生命`);
+                }
+                // 其他无需目标的效果保持不变
                 else if(card.effect === 'shield') {
                     let s = Math.floor(baseVal * shieldMult * upgradeMult);
                     owner.shield = Math.min(owner.shield + s, owner.maxHp);
@@ -682,35 +745,13 @@
                     gameState.heroes.forEach(h => { if(!h.dead) h.shield = Math.min(h.shield+s, h.maxHp); });
                     addLog(`全体获得 ${s} 护盾`);
                 }
-                else if(card.effect === 'heal') {
-                    let h = Math.floor(baseVal * healMult * upgradeMult);
-                    owner.currentHp = Math.min(owner.currentHp + h, owner.maxHp);
-                    addLog(`${owner.name} 回复 ${h} 生命`);
-                }
                 else if(card.effect === 'heal_all') {
                     let h = Math.floor(baseVal * healMult * upgradeMult);
                     gameState.heroes.forEach(hero => { if(!hero.dead) hero.currentHp = Math.min(hero.currentHp+h, hero.maxHp); });
                     addLog(`全体回复 ${h} 生命`);
                 }
                 else if(card.effect === 'aoe') {
-                    gameState.enemies.forEach(e => { 
-                        if(e.currentHp>0) { 
-                            let d = applyDamage(e, baseVal); 
-                            if(d>0) addLog(`${e.name} 受到 ${d} 伤害`); 
-                        } 
-                    });
-                }
-                else if(card.effect === 'damage_shield' && targetIdx != null) {
-                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
-                    let s = Math.floor((card.shieldBase||0) * shieldMult * upgradeMult);
-                    owner.shield = Math.min(owner.shield+s, owner.maxHp);
-                    addLog(`造成 ${d} 伤害，获得 ${s} 护盾`);
-                }
-                else if(card.effect === 'damage_heal_all' && targetIdx != null) {
-                    let d = applyDamage(gameState.enemies[targetIdx], baseVal);
-                    let h = Math.floor((card.healBase||0) * healMult * upgradeMult);
-                    gameState.heroes.forEach(hero => { if(!hero.dead) hero.currentHp = Math.min(hero.currentHp+h, hero.maxHp); });
-                    addLog(`造成 ${d} 伤害，全体回复 ${h}`);
+                    gameState.enemies.forEach(e => { if(e.currentHp>0) { let d = applyDamage(e, baseVal); if(d>0) addLog(`${e.name} 受到 ${d} 伤害`); } });
                 }
                 else if(card.effect === 'multi') {
                     for(let i=0; i<(card.times||2); i++) {
@@ -746,11 +787,8 @@
                     gameState.traps.push(owner);
                     addLog(`🎯 布置陷阱！敌人攻击时受到 ${owner.trapDmg} 伤害`);
                 }
-                if(card.draw) {
-                    drawCards(card.draw);
-                    addLog(`🃏 抽 ${card.draw} 张牌`);
-                }
                 
+                if(card.draw) { drawCards(card.draw); addLog(`🃏 抽 ${card.draw} 张牌`); }
                 if(card.effect === 'draw_1') drawCards(1);
                 if(card.effect === 'draw_2') drawCards(2);
                 if(card.effect === 'extra_mana') {
@@ -772,15 +810,11 @@
                     addLog(`🛡️ 全队获得 ${s} 护盾`);
                 }
                 if(card.effect === 'buff_team') {
-                    gameState.heroes.forEach(h=>{
-                        if(!h.dead) h.atkMult = Math.min((h.atkMult||1)*1.05, 3.0);
-                    });
+                    gameState.heroes.forEach(h=>{ if(!h.dead) h.atkMult = Math.min((h.atkMult||1)*1.05, 3.0); });
                     addLog(`💪 全队攻击提升！`);
                 }
                 if(card.effect === 'debuff_enemy') {
-                    gameState.enemies.forEach(e=>{
-                        if(e.currentHp>0) e.debuffs.push({...card.debuff});
-                    });
+                    gameState.enemies.forEach(e=>{ if(e.currentHp>0) e.debuffs.push({...card.debuff}); });
                     addLog(`❄️ 全体敌人附加 ${card.debuff.type}！`);
                 }
                 if(card.effect === 'upgrade_random') {
@@ -793,9 +827,7 @@
                 }
                 if(card.effect === 'lifesteal_all') {
                     let totalDmg = 0;
-                    gameState.enemies.forEach(e=>{
-                        if(e.currentHp>0) totalDmg += applyDamage(e, baseVal);
-                    });
+                    gameState.enemies.forEach(e=>{ if(e.currentHp>0) totalDmg += applyDamage(e, baseVal); });
                     let heal = Math.floor(totalDmg*0.3);
                     gameState.heroes.forEach(h=>{ if(!h.dead) h.currentHp = Math.min(h.currentHp+heal, h.maxHp); });
                     addLog(`💀 全体吸血，回复 ${heal} 生命`);
@@ -806,8 +838,8 @@
                     if(exist) exist.stacks += card.buff.stacks;
                     else owner.buffs.push({...card.buff, stacks: card.buff.stacks||1});
                 }
-                if(card.debuff && targetIdx!=null) {
-                    let enemy = gameState.enemies[targetIdx];
+                if(card.debuff && enemyTargetIdx!=null) {
+                    let enemy = gameState.enemies[enemyTargetIdx];
                     if(enemy && enemy.currentHp > 0){
                         let exist = enemy.debuffs.find(d=>d.type===card.debuff.type);
                         if(exist) exist.stacks += card.debuff.stacks;
@@ -1002,8 +1034,12 @@
             
             function updateBattlefield(){
                 const hDiv=document.getElementById('heroesSide'); hDiv.innerHTML='';
-                gameState.heroes.forEach(h=>{
+                gameState.heroes.forEach((h, idx)=>{
                     const d=document.createElement('div'); d.className=`unit hero ${h.dead?'dead':''}`;
+                    if(gameState.selectingTarget && gameState.targetType === 'ally' && !h.dead) {
+                        d.classList.add('targetable');
+                        d.onclick = () => selectAllyTarget(idx);
+                    }
                     d.innerHTML=`<div class="unit-icon">${h.icon}</div><div class="unit-name">${h.name}</div>
                         <div class="hp-bar"><div class="hp-fill" style="width:${(h.currentHp/h.maxHp)*100}%"></div></div>
                         <div class="hp-text">${h.currentHp}/${h.maxHp}${h.shield>0?`+${h.shield}`:''}</div>
@@ -1021,9 +1057,9 @@
                         <div class="hp-text">${e.currentHp}/${e.maxHp}${e.shield>0?`+${e.shield}`:''}</div>
                         <div class="enemy-intent">${intentTxt}</div>
                         <div class="unit-effects">${e.debuffs.map(d=>`<span class="effect-badge debuff">${d.type}${d.stacks>1?d.stacks:''}</span>`).join('')}</div>`;
-                    if(e.currentHp>0 && gameState.selectingTarget!==null) {
+                    if(e.currentHp>0 && gameState.selectingTarget && gameState.targetType === 'enemy') {
                         d.classList.add('targetable');
-                        d.onclick=()=>selectTarget(i);
+                        d.onclick=()=>selectEnemyTarget(i);
                     }
                     eDiv.appendChild(d);
                 });
@@ -1033,7 +1069,7 @@
                 const c=document.getElementById('handCards'); c.innerHTML='';
                 gameState.hand.forEach((card,i)=>{
                     const div=document.createElement('div'); 
-                    const unplayable=gameState.mana<card.cost||gameState.selectingTarget!==null;
+                    const unplayable=gameState.mana<card.cost||gameState.selectingTarget;
                     div.className=`game-card ${card.type} ${unplayable?'unplayable':''}`;
                     const totalBase = (card.baseValue||0) + (card.growthBonus||0);
                     let desc = card.desc || '';
@@ -1051,10 +1087,7 @@
             }
             
             function endTurn(){ 
-                if(gameState.selectingTarget) {
-                    document.getElementById('hint').classList.remove('active');
-                    gameState.selectingTarget=null;
-                }
+                if(gameState.selectingTarget) clearTargetSelection();
                 gameState.discard.push(...gameState.hand); 
                 gameState.hand=[]; 
                 updateUI(); 
