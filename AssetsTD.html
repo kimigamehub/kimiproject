@@ -496,24 +496,132 @@
         };
 
         // ============================================================
-        //  建 筑 定 义  （新增 6 种）
+        //  建 筑 定 义  （含 炮 台 初 始 属 性）
         // ============================================================
         const BUILDINGS = {
             campfire: { name: '篝火', icon: '🔥', cost: {}, hp: 250, size: 40 },
 
-            // ---- 炮台 ----
-            turret: { name: '标准炮台', icon: '🔫', cost: { iron: 15, copper: 10 }, hp: 90, size: 32, isTurret: true,
-            turretType: 'standard' },
-            flame_turret: { name: '火焰炮台', icon: '🔥', cost: { iron: 20, coal: 15, sand: 8 }, hp: 80, size: 32,
-                isTurret: true, turretType: 'flame' },
-            ice_turret: { name: '冰冻炮台', icon: '❄️', cost: { iron: 18, lead: 12, silver: 4 }, hp: 75, size: 32,
-                isTurret: true, turretType: 'ice' },
-            shock_turret: { name: '电击炮台', icon: '⚡', cost: { iron: 22, copper: 18, gold: 3 }, hp: 85, size: 32,
-                isTurret: true, turretType: 'shock' },
-            sniper_turret: { name: '狙击炮台', icon: '🎯', cost: { iron: 25, titanium: 8, glass: 6 }, hp: 70, size: 32,
-                isTurret: true, turretType: 'sniper' },
-            cannon_turret: { name: '加农炮台', icon: '💥', cost: { iron: 30, coal: 20, lead: 10 }, hp: 120, size: 36,
-                isTurret: true, turretType: 'cannon' },
+            // ---- 炮台（每个炮台带初始属性） ----
+            turret: {
+                name: '标准炮台',
+                icon: '🔫',
+                cost: { iron: 15, copper: 10 },
+                hp: 90,
+                size: 32,
+                isTurret: true,
+                turretType: 'standard',
+                baseDamage: 15,
+                baseFireRate: 1.0,
+                baseRange: 150,
+                baseProjSpeed: 5,
+                baseSplash: 0,
+                basePierce: 0,
+                baseCrit: 0.05,
+                baseSlow: 0,
+                baseBurn: 0,
+                baseChain: 0,
+                baseRad: 0,
+            },
+            flame_turret: {
+                name: '火焰炮台',
+                icon: '🔥',
+                cost: { iron: 20, coal: 15, sand: 8 },
+                hp: 80,
+                size: 32,
+                isTurret: true,
+                turretType: 'flame',
+                baseDamage: 12,
+                baseFireRate: 0.9,
+                baseRange: 140,
+                baseProjSpeed: 4.5,
+                baseSplash: 0,
+                basePierce: 0,
+                baseCrit: 0.03,
+                baseSlow: 0,
+                baseBurn: 4,
+                baseChain: 0,
+                baseRad: 0,
+            },
+            ice_turret: {
+                name: '冰冻炮台',
+                icon: '❄️',
+                cost: { iron: 18, lead: 12, silver: 4 },
+                hp: 75,
+                size: 32,
+                isTurret: true,
+                turretType: 'ice',
+                baseDamage: 10,
+                baseFireRate: 0.8,
+                baseRange: 145,
+                baseProjSpeed: 4.5,
+                baseSplash: 0,
+                basePierce: 0,
+                baseCrit: 0.03,
+                baseSlow: 0.3,
+                baseBurn: 0,
+                baseChain: 0,
+                baseRad: 0,
+            },
+            shock_turret: {
+                name: '电击炮台',
+                icon: '⚡',
+                cost: { iron: 22, copper: 18, gold: 3 },
+                hp: 85,
+                size: 32,
+                isTurret: true,
+                turretType: 'shock',
+                baseDamage: 18,
+                baseFireRate: 0.7,
+                baseRange: 155,
+                baseProjSpeed: 6,
+                baseSplash: 0,
+                basePierce: 0,
+                baseCrit: 0.04,
+                baseSlow: 0,
+                baseBurn: 0,
+                baseChain: 2,
+                baseRad: 0,
+            },
+            sniper_turret: {
+                name: '狙击炮台',
+                icon: '🎯',
+                cost: { iron: 25, titanium: 8, glass: 6 },
+                hp: 70,
+                size: 32,
+                isTurret: true,
+                turretType: 'sniper',
+                baseDamage: 35,
+                baseFireRate: 0.6,
+                baseRange: 280,
+                baseProjSpeed: 8,
+                baseSplash: 0,
+                basePierce: 2,
+                baseCrit: 0.15,
+                baseSlow: 0,
+                baseBurn: 0,
+                baseChain: 0,
+                baseRad: 0,
+            },
+            cannon_turret: {
+                name: '加农炮台',
+                icon: '💥',
+                cost: { iron: 30, coal: 20, lead: 10 },
+                hp: 120,
+                size: 36,
+                isTurret: true,
+                turretType: 'cannon',
+                baseDamage: 30,
+                baseFireRate: 0.7,
+                baseRange: 200,
+                baseProjSpeed: 5.5,
+                baseSplash: 20,
+                basePierce: 1,
+                baseCrit: 0.06,
+                baseSlow: 0,
+                baseBurn: 0,
+                baseChain: 0,
+                baseRad: 0,
+            },
 
             // ---- 防御 ----
             wall: { name: '围墙', icon: '🧱', cost: { iron: 5, sand: 12 }, hp: 400, size: 35 },
@@ -724,14 +832,18 @@
         }
 
         // ============================================================
-        //  炮 台 更 新 （支 持 新 类 型）
+        //  炮 台 更 新 （支 持 新 类 型 + 初 始 属 性）
         // ============================================================
         function updateTurret(t, dt) {
             const turretType = t.turretType || 'standard';
+            const info = BUILDINGS[t.type];
+            if (!info) return;
+
             t.cooldown = (t.cooldown || 0) - dt;
             if (t.cooldown > 0) return;
 
-            const baseRange = turretType === 'sniper' ? 280 : turretType === 'cannon' ? 200 : 150;
+            // 读取初始属性（从BUILDINGS定义中获取），并叠加升级
+            const baseRange = info.baseRange || 150;
             const range = baseRange + (t.upgrades?.silver || 0) * TURRET_UPGRADES.silver.step;
             // 雷达加成
             let radarBonus = 0;
@@ -753,26 +865,37 @@
             }
             if (!target) return;
 
-            const baseFireRate = turretType === 'sniper' ? 0.6 : turretType === 'cannon' ? 0.7 : 1.0;
+            const baseFireRate = info.baseFireRate || 1.0;
             const fireRate = baseFireRate + (t.upgrades?.titanium || 0) * TURRET_UPGRADES.titanium.step;
             t.cooldown = 1 / Math.max(fireRate, 0.15);
 
             // 基础伤害
-            let baseDmg = turretType === 'sniper' ? 35 : turretType === 'cannon' ? 30 : turretType === 'flame' ? 12 :
-                turretType === 'ice' ? 10 : turretType === 'shock' ? 18 : 15;
+            let baseDmg = info.baseDamage || 15;
             let damage = baseDmg + (t.upgrades?.gold || 0) * TURRET_UPGRADES.gold.step;
 
-            const splash = (t.upgrades?.nuclear_fuel || 0) * TURRET_UPGRADES.nuclear_fuel.step + (turretType === 'cannon' ?
-                20 : 0);
-            const pierce = Math.floor((t.upgrades?.iron || 0) * TURRET_UPGRADES.iron.step);
-            const crit = (t.upgrades?.diamond || 0) * TURRET_UPGRADES.diamond.step;
-            const projSpeed = 5 + (t.upgrades?.aluminum || 0) * TURRET_UPGRADES.aluminum.step + (turretType === 'sniper' ?
-                3 : 0);
-            const chain = Math.floor((t.upgrades?.copper || 0) * TURRET_UPGRADES.copper.step) + (turretType === 'shock' ?
-                2 : 0);
-            const slow = (t.upgrades?.lead || 0) * TURRET_UPGRADES.lead.step + (turretType === 'ice' ? 0.3 : 0);
-            const burn = (t.upgrades?.graphite || 0) * TURRET_UPGRADES.graphite.step + (turretType === 'flame' ? 4 : 0);
-            const rad = (t.upgrades?.thorium || 0) * TURRET_UPGRADES.thorium.step;
+            const baseSplash = info.baseSplash || 0;
+            const splash = baseSplash + (t.upgrades?.nuclear_fuel || 0) * TURRET_UPGRADES.nuclear_fuel.step;
+
+            const basePierce = info.basePierce || 0;
+            const pierce = basePierce + Math.floor((t.upgrades?.iron || 0) * TURRET_UPGRADES.iron.step);
+
+            const baseCrit = info.baseCrit || 0.05;
+            const crit = baseCrit + (t.upgrades?.diamond || 0) * TURRET_UPGRADES.diamond.step;
+
+            const baseProjSpeed = info.baseProjSpeed || 5;
+            const projSpeed = baseProjSpeed + (t.upgrades?.aluminum || 0) * TURRET_UPGRADES.aluminum.step;
+
+            const baseChain = info.baseChain || 0;
+            const chain = baseChain + Math.floor((t.upgrades?.copper || 0) * TURRET_UPGRADES.copper.step);
+
+            const baseSlow = info.baseSlow || 0;
+            const slow = baseSlow + (t.upgrades?.lead || 0) * TURRET_UPGRADES.lead.step;
+
+            const baseBurn = info.baseBurn || 0;
+            const burn = baseBurn + (t.upgrades?.graphite || 0) * TURRET_UPGRADES.graphite.step;
+
+            const baseRad = info.baseRad || 0;
+            const rad = baseRad + (t.upgrades?.thorium || 0) * TURRET_UPGRADES.thorium.step;
 
             const dx = target.x - t.x;
             const dy = target.y - t.y;
@@ -854,7 +977,6 @@
                     if (Math.random() < 0.25) spawnParticle(e.x + rand(-6, 6), e.y + rand(-6, 6), '#ff8800', 2);
                 }
                 if (e.rad && e.rad > 0) {
-                    // 辐射伤害周围敌人
                     for (const other of enemies) {
                         if (other === e) continue;
                         if (dist(e.x, e.y, other.x, other.y) < 40) {
@@ -865,10 +987,7 @@
 
                 // 碰撞建筑
                 for (const b of buildings) {
-                    if (b.type === 'wall' || b.type === 'turret' || b.type === 'drill' ||
-                        b.type === 'flame_turret' || b.type === 'ice_turret' || b.type === 'shock_turret' ||
-                        b.type === 'sniper_turret' || b.type === 'cannon_turret' ||
-                        b.isRadar || b.isRepair || b.isAmmo) {
+                    if (b.type === 'wall' || b.isTurret || b.isRadar || b.isRepair || b.isAmmo) {
                         const bd = dist(e.x, e.y, b.x, b.y);
                         if (bd < (b.size || 30) + e.size) {
                             b.hp -= e.damage * dt * 0.3;
@@ -1089,7 +1208,6 @@
                     }
                 }
                 if (b.isRepair) {
-                    // 修理站：修复周围建筑
                     b.repairTimer = (b.repairTimer || 0) + dt;
                     if (b.repairTimer > 1.5) {
                         b.repairTimer = 0;
@@ -1228,7 +1346,7 @@
         }
 
         // ============================================================
-        //  建 造 系 统
+        //  建 造 系 统 （修 复 第 二 个 建 筑 问 题）
         // ============================================================
         function toggleBuildMenu() {
             const menu = document.getElementById('buildMenu');
@@ -1260,23 +1378,33 @@
         function canBuild(x, y) {
             const info = BUILDINGS[buildMode];
             if (!info) return false;
+            // 检查资源
             for (const [k, v] of Object.entries(info.cost)) {
                 if ((resources[k] || 0) < v) return false;
             }
+            // 检查距离
             if (dist(x, y, player.x, player.y) > CONFIG.BUILD_RANGE) return false;
+            // 检查碰撞（不能重叠）
+            const size = info.size || 30;
             for (const b of buildings) {
-                const s1 = info.size || 30;
-                const s2 = b.size || 30;
-                if (dist(x, y, b.x, b.y) < (s1 + s2) / 2 + 4) return false;
+                const bs = b.size || 30;
+                if (dist(x, y, b.x, b.y) < (size + bs) / 2 + 4) return false;
             }
             return true;
         }
 
         function doBuild(x, y) {
-            if (!buildMode || !canBuild(x, y)) return;
+            if (!buildMode || !canBuild(x, y)) {
+                if (buildMode) showMsg('❌ 无法建造：资源不足、距离太远或位置被占用');
+                return;
+            }
             const info = BUILDINGS[buildMode];
-            for (const [k, v] of Object.entries(info.cost)) resources[k] -= v;
+            // 扣除资源
+            for (const [k, v] of Object.entries(info.cost)) {
+                resources[k] = (resources[k] || 0) - v;
+            }
 
+            // 创建建筑对象，炮台自动继承初始属性（由updateTurret从BUILDINGS读取）
             const b = {
                 x,
                 y,
@@ -1293,6 +1421,7 @@
                 mineTimer: 0,
                 prodTimer: 0,
                 repairTimer: 0,
+                cooldown: 0,
             };
             if (info.factory) {
                 for (const [mat, rec] of Object.entries(MATERIALS)) {
@@ -1524,7 +1653,6 @@
                     if (!info) continue;
                     const x = tx * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
                     const y = ty * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
-                    // 大小随储量变化：4 ~ 14
                     const ratio = vein.amount / vein.maxAmount;
                     const radius = 4 + ratio * 10;
                     ctx.fillStyle = info.color;
@@ -1534,12 +1662,10 @@
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.shadowBlur = 0;
-                    // 高亮（靠近玩家）
                     if (nearestOre && Math.abs(nearestOre.x - x) < 2 && Math.abs(nearestOre.y - y) < 2) {
                         ctx.strokeStyle = '#fff';
                         ctx.lineWidth = 2;
                         ctx.stroke();
-                        // 显示储量
                         ctx.fillStyle = 'rgba(0,0,0,0.6)';
                         ctx.fillRect(x - 12, y - 24, 24, 14);
                         ctx.fillStyle = '#fff';
@@ -1580,7 +1706,6 @@
             const x = b.x,
                 y = b.y;
 
-            // 背景
             const grad = ctx.createRadialGradient(x, y, 0, x, y, s);
             if (b.isTurret) {
                 grad.addColorStop(0, 'rgba(60,70,100,0.9)');
@@ -1598,18 +1723,15 @@
             ctx.lineWidth = 1;
             ctx.strokeRect(x - s / 2, y - s / 2, s, s);
 
-            // 图标
             ctx.font = (s > 32 ? 22 : 18) + 'px sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(info.icon, x, y + 1);
 
-            // 名称
             ctx.fillStyle = 'rgba(255,255,255,0.4)';
             ctx.font = '7px sans-serif';
             ctx.fillText(info.name, x, y + s / 2 + 9);
 
-            // HP
             const maxHp = info.hp || 100;
             if (b.hp < maxHp) {
                 const pct = b.hp / maxHp;
@@ -1619,7 +1741,6 @@
                 ctx.fillRect(x - s / 2 + 2, y + s / 2 + 2, (s - 4) * pct, 3);
             }
 
-            // 选中
             if (selectedBuilding === b) {
                 ctx.strokeStyle = '#f39c12';
                 ctx.lineWidth = 2;
@@ -1632,7 +1753,6 @@
 
         function renderEnemy(e) {
             const r = e.size;
-            // 身体
             const color = e.burnTimer > 0 ? '#ff6600' : e.isElite ? '#9b59b6' : '#8e44ad';
             ctx.shadowColor = e.isElite ? '#9b59b6' : '#8e44ad';
             ctx.shadowBlur = e.isElite ? 20 : 10;
@@ -1642,7 +1762,6 @@
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // 眼睛
             ctx.fillStyle = e.hitFlash > 0 ? '#ff0000' : '#c0392b';
             ctx.beginPath();
             ctx.arc(e.x - r * 0.3, e.y - r * 0.2, r * 0.25, 0, Math.PI * 2);
@@ -1651,7 +1770,6 @@
             ctx.arc(e.x + r * 0.3, e.y - r * 0.2, r * 0.25, 0, Math.PI * 2);
             ctx.fill();
 
-            // 精英标记
             if (e.isElite) {
                 ctx.strokeStyle = '#f1c40f';
                 ctx.lineWidth = 2;
@@ -1660,7 +1778,6 @@
                 ctx.stroke();
             }
 
-            // HP
             const pct = e.hp / e.maxHp;
             ctx.fillStyle = 'rgba(0,0,0,0.6)';
             ctx.fillRect(e.x - r, e.y - r - 8, r * 2, 3);
@@ -1682,7 +1799,6 @@
             ctx.fill();
             ctx.shadowBlur = 0;
 
-            // 采集范围
             if (nearestOre) {
                 ctx.strokeStyle = 'rgba(255,255,255,0.12)';
                 ctx.setLineDash([4, 6]);
@@ -1712,7 +1828,6 @@
                 if (buildMode) {
                     doBuild(wx, wy);
                 } else {
-                    // 选择建筑
                     let found = null;
                     for (const b of buildings) {
                         if (dist(wx, wy, b.x, b.y) < (b.size || 30)) {
@@ -1730,7 +1845,6 @@
                 }
             });
 
-            // 摇杆
             const jz = document.getElementById('joystickZone');
             const jbase = document.getElementById('joystickBase');
             const jknob = document.getElementById('joystickKnob');
@@ -1765,7 +1879,6 @@
                 joystick.dy = dy / maxR;
             }
 
-            // 键盘
             window.addEventListener('keydown', e => {
                 const spd = player.speed * 2.2;
                 if (e.key === 'w' || e.key === 'ArrowUp') player.y -= spd;
@@ -1778,7 +1891,6 @@
                 if (e.key === 'q' || e.key === 'Q') sellBuilding();
             });
 
-            // 鼠标移动更新世界坐标
             canvas.addEventListener('pointermove', e => {
                 const rect = canvas.getBoundingClientRect();
                 lastMouseWorldX = (e.clientX - rect.left) + camera.x;
@@ -1798,7 +1910,6 @@
             window.addEventListener('resize', resize);
             setupInputs();
 
-            // 重置状态
             campfire.x = 0;
             campfire.y = 0;
             player.x = 60;
@@ -1835,12 +1946,10 @@
             canvas.height = H;
         }
 
-        // 页面加载完成
         window.onload = function() {
             canvas = document.getElementById('gameCanvas');
             ctx = canvas.getContext('2d');
             resize();
-            // 预渲染
             ctx.fillStyle = '#1a1a2e';
             ctx.fillRect(0, 0, W, H);
         };
