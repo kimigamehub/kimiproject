@@ -1,0 +1,1849 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>篝火防线 · 无尽矿脉</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        body {
+            overflow: hidden;
+            background: #1a1a2e;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+
+        #ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #ui-layer>* {
+            pointer-events: auto;
+        }
+
+        .top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 6px 10px;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(4px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 4px;
+            font-size: 12px;
+        }
+        .phase-badge {
+            padding: 3px 12px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 13px;
+            color: #fff;
+            white-space: nowrap;
+        }
+        .phase-day {
+            background: #f39c12;
+        }
+        .phase-night {
+            background: #8e44ad;
+        }
+        .stat-box {
+            color: #fff;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            white-space: nowrap;
+        }
+        .hp-bar {
+            width: 60px;
+            height: 8px;
+            background: #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .hp-fill {
+            height: 100%;
+            background: #e74c3c;
+            transition: width 0.3s;
+        }
+
+        .res-bar {
+            position: absolute;
+            top: 44px;
+            left: 0;
+            right: 0;
+            display: flex;
+            gap: 3px;
+            padding: 3px 6px;
+            overflow-x: auto;
+            background: rgba(0, 0, 0, 0.5);
+            scrollbar-width: none;
+            flex-wrap: nowrap;
+        }
+        .res-bar::-webkit-scrollbar {
+            display: none;
+        }
+        .res-item {
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+        .res-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .bottom-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 8px 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(2px);
+        }
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+            color: #fff;
+            cursor: pointer;
+            transition: transform 0.08s;
+            pointer-events: auto;
+            flex: 1;
+            text-align: center;
+            min-width: 50px;
+        }
+        .btn:active {
+            transform: scale(0.94);
+        }
+        .btn-primary {
+            background: #2980b9;
+        }
+        .btn-success {
+            background: #27ae60;
+        }
+        .btn-danger {
+            background: #c0392b;
+        }
+        .btn-warning {
+            background: #d35400;
+        }
+        .btn-purple {
+            background: #8e44ad;
+        }
+        .btn-teal {
+            background: #1abc9c;
+        }
+
+        .menu-panel {
+            position: absolute;
+            bottom: 68px;
+            left: 6px;
+            right: 6px;
+            max-height: 50vh;
+            background: rgba(16, 16, 28, 0.96);
+            border-radius: 14px;
+            padding: 10px;
+            overflow-y: auto;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+        }
+        .menu-panel.active {
+            display: block;
+        }
+        .menu-title {
+            color: #fff;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+        .menu-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 6px;
+        }
+        .menu-item {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 6px 4px;
+            text-align: center;
+            color: #fff;
+            font-size: 10px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .menu-item:active {
+            background: rgba(255, 255, 255, 0.18);
+        }
+        .menu-item .icon {
+            font-size: 22px;
+            margin-bottom: 2px;
+        }
+        .menu-item .cost {
+            color: #aaa;
+            font-size: 9px;
+            margin-top: 2px;
+        }
+
+        .upgrade-panel {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 92%;
+            max-width: 380px;
+            background: rgba(16, 16, 28, 0.97);
+            border-radius: 16px;
+            padding: 16px;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-height: 80vh;
+            overflow-y: auto;
+            backdrop-filter: blur(8px);
+        }
+        .upgrade-panel.active {
+            display: block;
+        }
+        .upgrade-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            color: #fff;
+            font-size: 12px;
+            gap: 6px;
+        }
+        .upgrade-row button {
+            padding: 3px 10px;
+            font-size: 10px;
+            border-radius: 6px;
+            border: none;
+            background: #f39c12;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .upgrade-row button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .msg {
+            position: absolute;
+            top: 28%;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #fff;
+            font-size: 18px;
+            font-weight: bold;
+            text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.5s;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 6px 18px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .msg.show {
+            opacity: 1;
+        }
+
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: #0f0f1e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+        #start-screen h1 {
+            font-size: 32px;
+            margin-bottom: 8px;
+            color: #f39c12;
+            text-shadow: 0 0 30px rgba(243, 156, 18, 0.4);
+        }
+        #start-screen p {
+            color: #aaa;
+            margin-bottom: 24px;
+            line-height: 1.6;
+            max-width: 380px;
+            font-size: 14px;
+        }
+        #start-screen .btn {
+            font-size: 18px;
+            padding: 14px 44px;
+            flex: none;
+        }
+
+        .joystick-zone {
+            position: absolute;
+            bottom: 72px;
+            left: 12px;
+            width: 100px;
+            height: 100px;
+            pointer-events: auto;
+            z-index: 5;
+        }
+        .joystick-base {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            position: relative;
+        }
+        .joystick-knob {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.35);
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        @media (max-aspect-ratio: 1/1) {
+            .bottom-controls .btn {
+                font-size: 10px;
+                padding: 8px 6px;
+            }
+            .top-bar {
+                font-size: 10px;
+                padding: 4px 6px;
+            }
+            .res-item {
+                font-size: 9px;
+                padding: 1px 4px;
+            }
+            .menu-grid {
+                grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+            }
+            .joystick-zone {
+                width: 80px;
+                height: 80px;
+                bottom: 64px;
+                left: 8px;
+            }
+            .joystick-knob {
+                width: 34px;
+                height: 34px;
+            }
+        }
+
+        @media (min-aspect-ratio: 1/1) {
+            .res-bar {
+                top: 0;
+                left: auto;
+                right: 0;
+                bottom: 0;
+                width: 130px;
+                flex-direction: column;
+                overflow-y: auto;
+                overflow-x: hidden;
+                background: rgba(0, 0, 0, 0.6);
+            }
+            .top-bar {
+                right: 130px;
+            }
+            .bottom-controls {
+                right: 130px;
+            }
+            .joystick-zone {
+                left: 20px;
+                bottom: 80px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>🔥 篝火防线</h1>
+        <p>白天采集矿脉，建造防线<br>夜晚僵尸源源不断，强度逐渐攀升<br>矿脉会重生 · 无限波次 · 多种炮台</p>
+        <button class="btn btn-primary" onclick="startGame()" style="font-size:18px;padding:15px 44px;">开始生存</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui-layer">
+        <div class="top-bar">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <div class="phase-badge" id="phaseBadge">☀️ 白天</div>
+                <div class="stat-box">⏱️ <span id="timeText">120</span>s</div>
+                <div class="stat-box">🌊 波次 <span id="waveText">1</span></div>
+                <div class="stat-box">🧟 <span id="enemyCount">0</span></div>
+            </div>
+            <div class="stat-box">
+                🔥 HP
+                <div class="hp-bar"><div class="hp-fill" id="hpBar" style="width:100%"></div></div>
+            </div>
+        </div>
+
+        <div class="res-bar" id="resBar"></div>
+
+        <div class="joystick-zone" id="joystickZone" style="display:none;">
+            <div class="joystick-base" id="joystickBase"><div class="joystick-knob" id="joystickKnob"></div></div>
+        </div>
+
+        <div class="bottom-controls">
+            <button class="btn btn-primary" onclick="toggleBuildMenu()">🏗️ 建造</button>
+            <button class="btn btn-success" onclick="doGather()" id="gatherBtn" style="display:none;">⛏️ 采集</button>
+            <button class="btn btn-warning" onclick="toggleUpgradeMenu()" id="upgradeBtn" style="display:none;">⚡ 升级</button>
+            <button class="btn btn-danger" onclick="sellBuilding()" id="sellBtn" style="display:none;">💰 出售</button>
+        </div>
+
+        <div class="menu-panel" id="buildMenu">
+            <div class="menu-title">🏗️ 建造菜单</div>
+            <div class="menu-grid" id="buildGrid"></div>
+        </div>
+
+        <div class="upgrade-panel" id="upgradePanel">
+            <div class="menu-title" id="upgradeTitle">炮台升级</div>
+            <div id="upgradeList"></div>
+            <button class="btn btn-danger" onclick="closeUpgrade()" style="width:100%;margin-top:10px;">关闭</button>
+        </div>
+
+        <div class="msg" id="msg"></div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  配 置
+        // ============================================================
+        const CONFIG = {
+            DAY_DURATION: 110,
+            NIGHT_DURATION: 85,
+            TILE_SIZE: 60,
+            PLAYER_SPEED: 3.2,
+            CAMPFIRE_HP: 250,
+            INTERACT_RANGE: 75,
+            BUILD_RANGE: 130,
+            ORE_RESPAWN_TIME: 50,
+            SPAWN_BASE_INTERVAL: 2.8,
+            SPAWN_MIN_INTERVAL: 0.25,
+        };
+
+        // 矿物定义
+        const ORES = {
+            iron: { name: '铁', color: '#B87333', rarity: 0.040, value: 1 },
+            coal: { name: '煤', color: '#3a3a3a', rarity: 0.045, value: 1 },
+            copper: { name: '铜', color: '#CD7F32', rarity: 0.036, value: 1 },
+            lead: { name: '铅', color: '#696969', rarity: 0.030, value: 1 },
+            sand: { name: '沙', color: '#F4A460', rarity: 0.050, value: 1 },
+            titanium: { name: '钛', color: '#C0C0C0', rarity: 0.020, value: 1 },
+            aluminum: { name: '铝', color: '#A9A9A9', rarity: 0.025, value: 1 },
+            gold: { name: '金', color: '#FFD700', rarity: 0.014, value: 1 },
+            silver: { name: '银', color: '#E0E0E0', rarity: 0.016, value: 1 },
+            diamond: { name: '钻', color: '#00CED1', rarity: 0.009, value: 1 },
+            thorium: { name: '钍', color: '#2ecc71', rarity: 0.011, value: 1 },
+        };
+
+        // 材料（工厂产物）
+        const MATERIALS = {
+            graphite: { name: '石墨', color: '#555', from: ['coal'], factory: 'compressor', time: 3 },
+            silicon: { name: '硅', color: '#708090', from: ['coal', 'sand'], factory: 'refinery', time: 4 },
+            glass: { name: '玻璃', color: '#87CEEB', from: ['sand', 'lead'], factory: 'furnace', time: 4 },
+            chip: { name: '芯片', color: '#2c3e50', from: ['silicon'], factory: 'lithography', time: 6 },
+            nuclear_fuel: { name: '核燃料', color: '#e74c3c', from: ['thorium', 'lead', 'copper'], factory: 'nuclear_plant',
+                time: 9 },
+        };
+
+        // ============================================================
+        //  建 筑 定 义  （新增 6 种）
+        // ============================================================
+        const BUILDINGS = {
+            campfire: { name: '篝火', icon: '🔥', cost: {}, hp: 250, size: 40 },
+
+            // ---- 炮台 ----
+            turret: { name: '标准炮台', icon: '🔫', cost: { iron: 15, copper: 10 }, hp: 90, size: 32, isTurret: true,
+            turretType: 'standard' },
+            flame_turret: { name: '火焰炮台', icon: '🔥', cost: { iron: 20, coal: 15, sand: 8 }, hp: 80, size: 32,
+                isTurret: true, turretType: 'flame' },
+            ice_turret: { name: '冰冻炮台', icon: '❄️', cost: { iron: 18, lead: 12, silver: 4 }, hp: 75, size: 32,
+                isTurret: true, turretType: 'ice' },
+            shock_turret: { name: '电击炮台', icon: '⚡', cost: { iron: 22, copper: 18, gold: 3 }, hp: 85, size: 32,
+                isTurret: true, turretType: 'shock' },
+            sniper_turret: { name: '狙击炮台', icon: '🎯', cost: { iron: 25, titanium: 8, glass: 6 }, hp: 70, size: 32,
+                isTurret: true, turretType: 'sniper' },
+            cannon_turret: { name: '加农炮台', icon: '💥', cost: { iron: 30, coal: 20, lead: 10 }, hp: 120, size: 36,
+                isTurret: true, turretType: 'cannon' },
+
+            // ---- 防御 ----
+            wall: { name: '围墙', icon: '🧱', cost: { iron: 5, sand: 12 }, hp: 400, size: 35 },
+
+            // ---- 工厂 ----
+            compressor: { name: '压缩机', icon: '⚙️', cost: { iron: 20, copper: 10 }, hp: 60, size: 35, factory: 'compressor' },
+            refinery: { name: '提炼机', icon: '🧪', cost: { iron: 25, copper: 15, glass: 5 }, hp: 60, size: 35,
+            factory: 'refinery' },
+            furnace: { name: '熔炉', icon: '🔥', cost: { iron: 20, coal: 12 }, hp: 60, size: 35, factory: 'furnace' },
+            lithography: { name: '光刻机', icon: '💾', cost: { iron: 30, gold: 5, glass: 10 }, hp: 60, size: 35,
+                factory: 'lithography' },
+            nuclear_plant: { name: '核处理厂', icon: '☢️', cost: { iron: 50, lead: 20, copper: 20 }, hp: 100, size: 40,
+                factory: 'nuclear_plant' },
+
+            // ---- 辅助 ----
+            radar: { name: '雷达站', icon: '📡', cost: { iron: 18, copper: 12, chip: 3 }, hp: 60, size: 32, isRadar: true },
+            repair_station: { name: '修理站', icon: '🔧', cost: { iron: 15, lead: 8, sand: 10 }, hp: 70, size: 32,
+                isRepair: true },
+            ammo_storage: { name: '弹药库', icon: '📦', cost: { iron: 20, copper: 10, lead: 8 }, hp: 80, size: 32,
+                isAmmo: true },
+        };
+
+        // 炮台升级配置
+        const TURRET_UPGRADES = {
+            gold: { name: '伤害', attr: 'damage', step: 2, per: 5, color: '#FFD700' },
+            titanium: { name: '射速', attr: 'fireRate', step: 0.06, per: 5, color: '#C0C0C0' },
+            nuclear_fuel: { name: '溅射', attr: 'splash', step: 6, per: 1, color: '#e74c3c' },
+            iron: { name: '穿透', attr: 'pierce', step: 1, per: 10, color: '#B87333' },
+            silver: { name: '射程', attr: 'range', step: 18, per: 5, color: '#C0C0C0' },
+            diamond: { name: '暴击', attr: 'crit', step: 0.06, per: 3, color: '#00CED1' },
+            aluminum: { name: '弹速', attr: 'projSpeed', step: 1.2, per: 5, color: '#A9A9A9' },
+            copper: { name: '连锁', attr: 'chain', step: 1, per: 8, color: '#CD7F32' },
+            lead: { name: '减速', attr: 'slow', step: 0.06, per: 5, color: '#696969' },
+            graphite: { name: '燃烧', attr: 'burn', step: 2.5, per: 5, color: '#555' },
+            thorium: { name: '辐射', attr: 'rad', step: 3, per: 3, color: '#2ecc71' },
+        };
+
+        // ============================================================
+        //  状 态
+        // ============================================================
+        let canvas, ctx, W, H;
+        let gameRunning = false;
+        let phase = 'day'; // day | night
+        let phaseTimer = CONFIG.DAY_DURATION;
+        let wave = 1;
+        let camera = { x: 0, y: 0 };
+        let worldSeed = Math.random() * 10000;
+
+        let player = { x: 0, y: 0, vx: 0, vy: 0, speed: CONFIG.PLAYER_SPEED, size: 16 };
+        let campfire = { x: 0, y: 0, hp: CONFIG.CAMPFIRE_HP, maxHp: CONFIG.CAMPFIRE_HP };
+        let resources = {};
+        let buildings = [];
+        let enemies = [];
+        let projectiles = [];
+        let particles = [];
+        let damageTexts = [];
+        let selectedBuilding = null;
+        let buildMode = null;
+
+        // 矿脉系统
+        let oreVeins = new Map(); // key: "tx,ty" => { type, amount, maxAmount, respawnTimer }
+
+        // 生成控制
+        let spawnTimer = 0;
+        let totalEnemiesSpawned = 0;
+
+        // 摇杆
+        let joystick = { active: false, dx: 0, dy: 0 };
+
+        // 鼠标世界坐标
+        let lastMouseWorldX = 0,
+            lastMouseWorldY = 0;
+
+        // 初始化资源
+        Object.keys(ORES).forEach(k => resources[k] = 30);
+        Object.keys(MATERIALS).forEach(k => resources[k] = 0);
+
+        // ============================================================
+        //  工 具 函 数
+        // ============================================================
+        function seededRandom(x, y) {
+            const n = Math.sin(x * 12.9898 + y * 78.233 + worldSeed) * 43758.5453;
+            return n - Math.floor(n);
+        }
+
+        function dist(x1, y1, x2, y2) {
+            const dx = x1 - x2,
+                dy = y1 - y2;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+        function rand(min, max) { return min + Math.random() * (max - min); }
+
+        function randInt(min, max) { return Math.floor(rand(min, max + 1)); }
+
+        function showMsg(text) {
+            const el = document.getElementById('msg');
+            el.textContent = text;
+            el.classList.add('show');
+            clearTimeout(el._hideTimer);
+            el._hideTimer = setTimeout(() => el.classList.remove('show'), 2200);
+        }
+
+        // ============================================================
+        //  矿 脉 系 统
+        // ============================================================
+        function getOreTypeAt(tx, ty) {
+            const r = seededRandom(tx, ty);
+            let cum = 0;
+            for (const [key, ore] of Object.entries(ORES)) {
+                cum += ore.rarity;
+                if (r < cum) return key;
+            }
+            return null;
+        }
+
+        function getOreVein(tx, ty) {
+            const key = `${tx},${ty}`;
+            if (oreVeins.has(key)) {
+                const v = oreVeins.get(key);
+                return v;
+            }
+            const type = getOreTypeAt(tx, ty);
+            if (!type) return null;
+            const maxAmount = 18 + Math.floor(seededRandom(tx + 0.3, ty + 0.7) * 32);
+            const vein = {
+                type,
+                amount: maxAmount,
+                maxAmount,
+                respawnTimer: 0,
+                tx,
+                ty
+            };
+            oreVeins.set(key, vein);
+            return vein;
+        }
+
+        function getOreAtWorld(wx, wy) {
+            const tx = Math.floor(wx / CONFIG.TILE_SIZE);
+            const ty = Math.floor(wy / CONFIG.TILE_SIZE);
+            return getOreVein(tx, ty);
+        }
+
+        function gatherOre(wx, wy) {
+            const vein = getOreAtWorld(wx, wy);
+            if (!vein || vein.amount <= 0) return null;
+            const gathered = Math.min(vein.amount, 2 + Math.floor(Math.random() * 2));
+            vein.amount -= gathered;
+            resources[vein.type] = (resources[vein.type] || 0) + gathered;
+            if (vein.amount <= 0) {
+                vein.respawnTimer = CONFIG.ORE_RESPAWN_TIME + Math.random() * 20;
+            }
+            return { type: vein.type, amount: gathered };
+        }
+
+        function updateOreVeins(dt) {
+            for (const [key, vein] of oreVeins) {
+                if (vein.amount <= 0 && vein.respawnTimer > 0) {
+                    vein.respawnTimer -= dt;
+                    if (vein.respawnTimer <= 0) {
+                        vein.amount = vein.maxAmount;
+                    }
+                }
+            }
+        }
+
+        // ============================================================
+        //  敌 人 生 成 （无 尽 刷 新）
+        // ============================================================
+        function spawnEnemy() {
+            const angle = Math.random() * Math.PI * 2;
+            const distSpawn = Math.max(W, H) * 0.55 + Math.random() * 180;
+            const ex = campfire.x + Math.cos(angle) * distSpawn;
+            const ey = campfire.y + Math.sin(angle) * distSpawn;
+
+            const baseHp = 20 + wave * 12 + Math.floor(wave * 0.5) * 5;
+            const baseSpeed = 0.7 + wave * 0.07 + Math.floor(wave / 10) * 0.1;
+            const baseDmg = 4 + wave * 1.8;
+
+            // 精英怪 (10%概率)
+            const isElite = Math.random() < 0.10;
+
+            enemies.push({
+                x: ex,
+                y: ey,
+                hp: isElite ? baseHp * 2.5 : baseHp,
+                maxHp: isElite ? baseHp * 2.5 : baseHp,
+                speed: Math.min(baseSpeed * (isElite ? 0.85 : 1), 3.8),
+                damage: isElite ? baseDmg * 2 : baseDmg,
+                size: isElite ? 20 : 13,
+                slowTimer: 0,
+                burnTimer: 0,
+                burnDmg: 0,
+                isElite,
+                hitFlash: 0,
+            });
+            totalEnemiesSpawned++;
+        }
+
+        function getSpawnInterval() {
+            // 波次越高，生成越快
+            const base = CONFIG.SPAWN_BASE_INTERVAL - wave * 0.035;
+            const clamped = Math.max(CONFIG.SPAWN_MIN_INTERVAL, base);
+            // 加入随机抖动
+            return clamped + (Math.random() - 0.5) * 0.3;
+        }
+
+        // ============================================================
+        //  炮 台 更 新 （支 持 新 类 型）
+        // ============================================================
+        function updateTurret(t, dt) {
+            const turretType = t.turretType || 'standard';
+            t.cooldown = (t.cooldown || 0) - dt;
+            if (t.cooldown > 0) return;
+
+            const baseRange = turretType === 'sniper' ? 280 : turretType === 'cannon' ? 200 : 150;
+            const range = baseRange + (t.upgrades?.silver || 0) * TURRET_UPGRADES.silver.step;
+            // 雷达加成
+            let radarBonus = 0;
+            for (const b of buildings) {
+                if (b.isRadar && dist(b.x, b.y, t.x, t.y) < 200) {
+                    radarBonus += 25;
+                }
+            }
+            const finalRange = range + radarBonus;
+
+            let target = null;
+            let minD = finalRange;
+            for (const e of enemies) {
+                const d = dist(t.x, t.y, e.x, e.y);
+                if (d < minD) {
+                    minD = d;
+                    target = e;
+                }
+            }
+            if (!target) return;
+
+            const baseFireRate = turretType === 'sniper' ? 0.6 : turretType === 'cannon' ? 0.7 : 1.0;
+            const fireRate = baseFireRate + (t.upgrades?.titanium || 0) * TURRET_UPGRADES.titanium.step;
+            t.cooldown = 1 / Math.max(fireRate, 0.15);
+
+            // 基础伤害
+            let baseDmg = turretType === 'sniper' ? 35 : turretType === 'cannon' ? 30 : turretType === 'flame' ? 12 :
+                turretType === 'ice' ? 10 : turretType === 'shock' ? 18 : 15;
+            let damage = baseDmg + (t.upgrades?.gold || 0) * TURRET_UPGRADES.gold.step;
+
+            const splash = (t.upgrades?.nuclear_fuel || 0) * TURRET_UPGRADES.nuclear_fuel.step + (turretType === 'cannon' ?
+                20 : 0);
+            const pierce = Math.floor((t.upgrades?.iron || 0) * TURRET_UPGRADES.iron.step);
+            const crit = (t.upgrades?.diamond || 0) * TURRET_UPGRADES.diamond.step;
+            const projSpeed = 5 + (t.upgrades?.aluminum || 0) * TURRET_UPGRADES.aluminum.step + (turretType === 'sniper' ?
+                3 : 0);
+            const chain = Math.floor((t.upgrades?.copper || 0) * TURRET_UPGRADES.copper.step) + (turretType === 'shock' ?
+                2 : 0);
+            const slow = (t.upgrades?.lead || 0) * TURRET_UPGRADES.lead.step + (turretType === 'ice' ? 0.3 : 0);
+            const burn = (t.upgrades?.graphite || 0) * TURRET_UPGRADES.graphite.step + (turretType === 'flame' ? 4 : 0);
+            const rad = (t.upgrades?.thorium || 0) * TURRET_UPGRADES.thorium.step;
+
+            const dx = target.x - t.x;
+            const dy = target.y - t.y;
+            const d = Math.sqrt(dx * dx + dy * dy);
+            if (d < 1) return;
+
+            let finalDmg = damage;
+            if (Math.random() < crit) finalDmg *= 2.2;
+
+            // 弹药库加成
+            let ammoBonus = 1;
+            for (const b of buildings) {
+                if (b.isAmmo && dist(b.x, b.y, t.x, t.y) < 150) {
+                    ammoBonus = 1.25;
+                    break;
+                }
+            }
+            finalDmg *= ammoBonus;
+
+            const proj = {
+                x: t.x,
+                y: t.y,
+                vx: (dx / d) * projSpeed,
+                vy: (dy / d) * projSpeed,
+                damage: finalDmg,
+                splash,
+                pierce,
+                chain,
+                slow,
+                burn,
+                rad,
+                hits: [],
+                life: 4,
+                turretType,
+                color: turretType === 'flame' ? '#ff6600' :
+                    turretType === 'ice' ? '#66ccff' :
+                    turretType === 'shock' ? '#ffff00' :
+                    turretType === 'sniper' ? '#ff4444' :
+                    turretType === 'cannon' ? '#ff8800' : '#ffeb3b',
+                size: turretType === 'cannon' ? 6 : 4,
+            };
+            projectiles.push(proj);
+
+            // 炮口粒子
+            for (let i = 0; i < 4; i++) {
+                spawnParticle(t.x, t.y, proj.color, 3);
+            }
+        }
+
+        // ============================================================
+        //  更 新 敌 人
+        // ============================================================
+        function updateEnemies(dt) {
+            for (const e of enemies) {
+                let tx = campfire.x,
+                    ty = campfire.y;
+                const dx = tx - e.x,
+                    dy = ty - e.y;
+                const d = Math.sqrt(dx * dx + dy * dy);
+
+                let spd = e.speed;
+                if (e.slowTimer > 0) {
+                    e.slowTimer -= dt;
+                    spd *= 0.45;
+                }
+                if (e.hitFlash > 0) e.hitFlash -= dt;
+
+                if (d > CONFIG.TILE_SIZE * 0.7) {
+                    e.x += (dx / d) * spd;
+                    e.y += (dy / d) * spd;
+                } else {
+                    campfire.hp -= e.damage * dt;
+                    if (campfire.hp <= 0) gameOver();
+                }
+
+                if (e.burnTimer > 0) {
+                    e.burnTimer -= dt;
+                    e.hp -= e.burnDmg * dt;
+                    if (Math.random() < 0.25) spawnParticle(e.x + rand(-6, 6), e.y + rand(-6, 6), '#ff8800', 2);
+                }
+                if (e.rad && e.rad > 0) {
+                    // 辐射伤害周围敌人
+                    for (const other of enemies) {
+                        if (other === e) continue;
+                        if (dist(e.x, e.y, other.x, other.y) < 40) {
+                            other.hp -= e.rad * dt * 0.5;
+                        }
+                    }
+                }
+
+                // 碰撞建筑
+                for (const b of buildings) {
+                    if (b.type === 'wall' || b.type === 'turret' || b.type === 'drill' ||
+                        b.type === 'flame_turret' || b.type === 'ice_turret' || b.type === 'shock_turret' ||
+                        b.type === 'sniper_turret' || b.type === 'cannon_turret' ||
+                        b.isRadar || b.isRepair || b.isAmmo) {
+                        const bd = dist(e.x, e.y, b.x, b.y);
+                        if (bd < (b.size || 30) + e.size) {
+                            b.hp -= e.damage * dt * 0.3;
+                            const push = ((b.size || 30) + e.size - bd) / 2;
+                            const pdx = (e.x - b.x) / (bd + 0.01);
+                            const pdy = (e.y - b.y) / (bd + 0.01);
+                            e.x += pdx * push;
+                            e.y += pdy * push;
+                        }
+                    }
+                }
+            }
+
+            // 清理死亡
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (enemies[i].hp <= 0) {
+                    if (Math.random() < 0.25) {
+                        const drops = ['iron', 'coal', 'lead', 'copper', 'sand'];
+                        const drop = drops[randInt(0, drops.length - 1)];
+                        resources[drop] = (resources[drop] || 0) + 1;
+                        spawnParticle(enemies[i].x, enemies[i].y, ORES[drop]?.color || '#fff', 5);
+                    }
+                    if (enemies[i].isElite && Math.random() < 0.6) {
+                        const drops = ['gold', 'silver', 'titanium', 'diamond'];
+                        const drop = drops[randInt(0, drops.length - 1)];
+                        resources[drop] = (resources[drop] || 0) + 1;
+                        spawnParticle(enemies[i].x, enemies[i].y, ORES[drop]?.color || '#fff', 8);
+                    }
+                    enemies.splice(i, 1);
+                }
+            }
+
+            // 清理死亡建筑
+            for (let i = buildings.length - 1; i >= 0; i--) {
+                if (buildings[i].hp <= 0) {
+                    if (buildings[i].type === 'campfire') { gameOver(); return; }
+                    buildings.splice(i, 1);
+                }
+            }
+        }
+
+        // ============================================================
+        //  更 新 投 射 物
+        // ============================================================
+        function updateProjectiles(dt) {
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+
+                if (p.life <= 0) {
+                    projectiles.splice(i, 1);
+                    continue;
+                }
+
+                let hit = false;
+                for (const e of enemies) {
+                    if (p.hits.includes(e)) continue;
+                    if (dist(p.x, p.y, e.x, e.y) < e.size + p.size + 4) {
+                        e.hp -= p.damage;
+                        e.hitFlash = 0.15;
+                        p.hits.push(e);
+
+                        if (p.slow > 0) e.slowTimer = 2.5;
+                        if (p.burn > 0) { e.burnTimer = 3.5;
+                            e.burnDmg = p.burn; }
+                        if (p.rad > 0) { e.rad = (e.rad || 0) + p.rad * 0.3; }
+
+                        spawnDamageText(e.x, e.y - 10, Math.floor(p.damage));
+                        spawnParticle(e.x, e.y, p.color, 6);
+
+                        if (p.splash > 0) {
+                            for (const ne of enemies) {
+                                if (ne === e) continue;
+                                if (dist(ne.x, ne.y, e.x, e.y) < p.splash) {
+                                    ne.hp -= p.damage * 0.5;
+                                    spawnParticle(ne.x, ne.y, '#ffaa44', 3);
+                                }
+                            }
+                        }
+
+                        if (p.chain > 0 && p.hits.length <= p.chain) {
+                            let next = null;
+                            let minD = 150;
+                            for (const ne of enemies) {
+                                if (p.hits.includes(ne)) continue;
+                                const d2 = dist(ne.x, ne.y, e.x, e.y);
+                                if (d2 < minD) { minD = d2;
+                                    next = ne; }
+                            }
+                            if (next) {
+                                const cdx = next.x - p.x;
+                                const cdy = next.y - p.y;
+                                const cd = Math.sqrt(cdx * cdx + cdy * cdy) || 1;
+                                const spd = Math.sqrt(p.vx * p.vx + p.vy * p.vy);
+                                p.vx = (cdx / cd) * spd;
+                                p.vy = (cdy / cd) * spd;
+                            } else {
+                                hit = true;
+                            }
+                        } else if (p.hits.length > p.pierce) {
+                            hit = true;
+                        }
+                        break;
+                    }
+                }
+                if (hit) {
+                    projectiles.splice(i, 1);
+                }
+            }
+        }
+
+        // ============================================================
+        //  粒 子 / 伤 害 文 字
+        // ============================================================
+        function spawnParticle(x, y, color, count = 3) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x,
+                    y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4 - 1,
+                    life: 0.4 + Math.random() * 0.6,
+                    color,
+                    size: 2 + Math.random() * 3,
+                });
+            }
+        }
+
+        function spawnDamageText(x, y, dmg) {
+            damageTexts.push({
+                x: x + rand(-10, 10),
+                y: y - 5,
+                text: '-' + dmg,
+                life: 0.9,
+                size: 14 + Math.random() * 6,
+            });
+        }
+
+        // ============================================================
+        //  游 戏 循 环
+        // ============================================================
+        let lastTime = performance.now();
+
+        function loop() {
+            if (!gameRunning) return;
+            const now = performance.now();
+            const dt = Math.min((now - lastTime) / 1000, 0.05);
+            lastTime = now;
+            update(dt);
+            render();
+            requestAnimationFrame(loop);
+        }
+
+        function update(dt) {
+            // 阶段计时
+            phaseTimer -= dt;
+            if (phaseTimer <= 0) {
+                if (phase === 'day') {
+                    startNight();
+                } else if (phase === 'night') {
+                    startDay();
+                }
+            }
+
+            // 玩家移动（摇杆）
+            let mx = 0,
+                my = 0;
+            if (joystick.active) {
+                mx = joystick.dx;
+                my = joystick.dy;
+            }
+            const len = Math.sqrt(mx * mx + my * my);
+            if (len > 0.08) {
+                player.x += (mx / len) * player.speed;
+                player.y += (my / len) * player.speed;
+            }
+
+            camera.x = player.x - W / 2;
+            camera.y = player.y - H / 2;
+
+            // 矿脉更新（重生）
+            updateOreVeins(dt);
+
+            // 建筑更新
+            for (const b of buildings) {
+                if (b.type === 'drill' && phase === 'day') {
+                    b.mineTimer = (b.mineTimer || 0) + dt;
+                    if (b.mineTimer > 2.5) {
+                        b.mineTimer = 0;
+                        const vein = getOreAtWorld(b.x, b.y);
+                        if (vein && vein.amount > 0) {
+                            const gathered = Math.min(vein.amount, 1 + Math.floor(Math.random() * 2));
+                            vein.amount -= gathered;
+                            resources[vein.type] = (resources[vein.type] || 0) + gathered;
+                            if (vein.amount <= 0) {
+                                vein.respawnTimer = CONFIG.ORE_RESPAWN_TIME + Math.random() * 15;
+                            }
+                        }
+                    }
+                }
+                if (b.factory && b.output) {
+                    const recipe = MATERIALS[b.output];
+                    if (recipe) {
+                        b.prodTimer = (b.prodTimer || 0) + dt;
+                        if (b.prodTimer >= recipe.time) {
+                            b.prodTimer = 0;
+                            let can = true;
+                            for (const ing of recipe.from) {
+                                if ((resources[ing] || 0) < 1) can = false;
+                            }
+                            if (can) {
+                                for (const ing of recipe.from) resources[ing]--;
+                                resources[b.output] = (resources[b.output] || 0) + 1;
+                            }
+                        }
+                    }
+                }
+                if (b.isRepair) {
+                    // 修理站：修复周围建筑
+                    b.repairTimer = (b.repairTimer || 0) + dt;
+                    if (b.repairTimer > 1.5) {
+                        b.repairTimer = 0;
+                        for (const other of buildings) {
+                            if (other === b) continue;
+                            if (dist(b.x, b.y, other.x, other.y) < 120) {
+                                const info = BUILDINGS[other.type];
+                                const maxHp = info?.hp || 100;
+                                if (other.hp < maxHp) {
+                                    other.hp = Math.min(other.hp + 6, maxHp);
+                                }
+                            }
+                        }
+                    }
+                }
+                if (b.isTurret && phase === 'night') {
+                    updateTurret(b, dt);
+                }
+            }
+
+            // 敌人生成（夜晚持续）
+            if (phase === 'night') {
+                spawnTimer -= dt;
+                if (spawnTimer <= 0) {
+                    spawnEnemy();
+                    spawnTimer = getSpawnInterval();
+                }
+            } else {
+                spawnTimer = 0;
+            }
+
+            // 更新敌人
+            updateEnemies(dt);
+
+            // 更新投射物
+            updateProjectiles(dt);
+
+            // 更新粒子
+            particles = particles.filter(p => {
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.vy += 0.15 * dt * 60;
+                p.life -= dt;
+                return p.life > 0;
+            });
+
+            // 更新伤害文字
+            damageTexts = damageTexts.filter(d => {
+                d.y -= 0.6;
+                d.life -= dt;
+                return d.life > 0;
+            });
+
+            // 检测附近矿脉（采集按钮）
+            updateNearest();
+
+            // UI
+            updateUI();
+        }
+
+        // ============================================================
+        //  昼 夜 切 换
+        // ============================================================
+        function startNight() {
+            phase = 'night';
+            phaseTimer = CONFIG.NIGHT_DURATION;
+            showMsg('🌙 夜幕降临！僵尸来袭！');
+            document.getElementById('phaseBadge').textContent = '🌙 夜晚';
+            document.getElementById('phaseBadge').className = 'phase-badge phase-night';
+            spawnTimer = 1.5;
+        }
+
+        function startDay() {
+            phase = 'day';
+            phaseTimer = CONFIG.DAY_DURATION;
+            wave++;
+            showMsg('☀️ 天亮了！新的一天');
+            document.getElementById('phaseBadge').textContent = '☀️ 白天';
+            document.getElementById('phaseBadge').className = 'phase-badge phase-day';
+            // 篝火回血
+            campfire.hp = Math.min(campfire.hp + 40, campfire.maxHp);
+            // 清除部分敌人（剩余的会留在场上但不再生成）
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                if (Math.random() < 0.3) {
+                    enemies.splice(i, 1);
+                }
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            showMsg('💀 篝火熄灭... 存活 ' + wave + ' 波');
+            document.getElementById('msg').classList.add('show');
+            setTimeout(() => location.reload(), 3500);
+        }
+
+        // ============================================================
+        //  交 互 检 测
+        // ============================================================
+        let nearestOre = null;
+        let nearestBuilding = null;
+
+        function updateNearest() {
+            nearestOre = null;
+            const tx = Math.floor(player.x / CONFIG.TILE_SIZE);
+            const ty = Math.floor(player.y / CONFIG.TILE_SIZE);
+            const cx = tx * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+            const cy = ty * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+            const vein = getOreVein(tx, ty);
+            if (vein && vein.amount > 0 && dist(player.x, player.y, cx, cy) < CONFIG.TILE_SIZE * 0.7) {
+                nearestOre = { x: cx, y: cy, vein };
+            }
+
+            nearestBuilding = null;
+            for (const b of buildings) {
+                if (dist(player.x, player.y, b.x, b.y) < CONFIG.INTERACT_RANGE) {
+                    nearestBuilding = b;
+                    break;
+                }
+            }
+        }
+
+        // ============================================================
+        //  采 集
+        // ============================================================
+        function doGather() {
+            if (!nearestOre) return;
+            const result = gatherOre(nearestOre.x, nearestOre.y);
+            if (result) {
+                spawnParticle(nearestOre.x, nearestOre.y, ORES[result.type]?.color || '#fff', 8);
+                showMsg('+' + result.amount + ' ' + (ORES[result.type]?.name || result.type));
+                updateNearest();
+            } else {
+                showMsg('矿脉已枯竭，等待重生...');
+            }
+        }
+
+        // ============================================================
+        //  建 造 系 统
+        // ============================================================
+        function toggleBuildMenu() {
+            const menu = document.getElementById('buildMenu');
+            menu.classList.toggle('active');
+            if (menu.classList.contains('active')) {
+                const grid = document.getElementById('buildGrid');
+                grid.innerHTML = '';
+                const buildable = Object.entries(BUILDINGS).filter(([k]) => k !== 'campfire');
+                for (const [key, info] of buildable) {
+                    const div = document.createElement('div');
+                    div.className = 'menu-item';
+                    const costStr = Object.entries(info.cost).map(([k, v]) =>
+                        `${ORES[k]?.name || MATERIALS[k]?.name || k}:${v}`
+                    ).join(' ');
+                    div.innerHTML =
+                        `<div class="icon">${info.icon}</div><div>${info.name}</div><div class="cost">${costStr || '免费'}</div>`;
+                    div.onclick = () => selectBuild(key);
+                    grid.appendChild(div);
+                }
+            }
+        }
+
+        function selectBuild(type) {
+            buildMode = type;
+            document.getElementById('buildMenu').classList.remove('active');
+            showMsg('点击地面建造 ' + BUILDINGS[type].name);
+        }
+
+        function canBuild(x, y) {
+            const info = BUILDINGS[buildMode];
+            if (!info) return false;
+            for (const [k, v] of Object.entries(info.cost)) {
+                if ((resources[k] || 0) < v) return false;
+            }
+            if (dist(x, y, player.x, player.y) > CONFIG.BUILD_RANGE) return false;
+            for (const b of buildings) {
+                const s1 = info.size || 30;
+                const s2 = b.size || 30;
+                if (dist(x, y, b.x, b.y) < (s1 + s2) / 2 + 4) return false;
+            }
+            return true;
+        }
+
+        function doBuild(x, y) {
+            if (!buildMode || !canBuild(x, y)) return;
+            const info = BUILDINGS[buildMode];
+            for (const [k, v] of Object.entries(info.cost)) resources[k] -= v;
+
+            const b = {
+                x,
+                y,
+                type: buildMode,
+                hp: info.hp || 100,
+                size: info.size || 30,
+                isTurret: info.isTurret || false,
+                turretType: info.turretType || null,
+                factory: info.factory || null,
+                isRadar: info.isRadar || false,
+                isRepair: info.isRepair || false,
+                isAmmo: info.isAmmo || false,
+                upgrades: {},
+                mineTimer: 0,
+                prodTimer: 0,
+                repairTimer: 0,
+            };
+            if (info.factory) {
+                for (const [mat, rec] of Object.entries(MATERIALS)) {
+                    if (rec.factory === info.factory) {
+                        b.output = mat;
+                        break;
+                    }
+                }
+            }
+            buildings.push(b);
+            buildMode = null;
+            showMsg('✅ ' + info.name + ' 建造完成！');
+            spawnParticle(x, y, '#4caf50', 12);
+        }
+
+        // ============================================================
+        //  出 售 建 筑
+        // ============================================================
+        function sellBuilding() {
+            if (!nearestBuilding || nearestBuilding.type === 'campfire') return;
+            const info = BUILDINGS[nearestBuilding.type];
+            // 返还一半资源
+            for (const [k, v] of Object.entries(info.cost)) {
+                resources[k] = (resources[k] || 0) + Math.floor(v / 2);
+            }
+            showMsg('💰 出售 ' + info.name + '，返还部分资源');
+            const idx = buildings.indexOf(nearestBuilding);
+            if (idx > -1) buildings.splice(idx, 1);
+            nearestBuilding = null;
+            document.getElementById('sellBtn').style.display = 'none';
+        }
+
+        // ============================================================
+        //  升 级 系 统
+        // ============================================================
+        function toggleUpgradeMenu() {
+            const panel = document.getElementById('upgradePanel');
+            if (panel.classList.contains('active')) {
+                panel.classList.remove('active');
+                return;
+            }
+            if (!nearestBuilding || !nearestBuilding.isTurret) return;
+            selectedBuilding = nearestBuilding;
+            panel.classList.add('active');
+            renderUpgradeList();
+        }
+
+        function renderUpgradeList() {
+            const list = document.getElementById('upgradeList');
+            list.innerHTML = '';
+            document.getElementById('upgradeTitle').textContent =
+                '⚡ 升级 ' + (BUILDINGS[selectedBuilding.type]?.name || '炮台');
+
+            for (const [key, info] of Object.entries(TURRET_UPGRADES)) {
+                const current = selectedBuilding.upgrades?.[key] || 0;
+                const hasMat = (resources[key] || 0) >= info.per;
+                const div = document.createElement('div');
+                div.className = 'upgrade-row';
+                const matName = ORES[key]?.name || MATERIALS[key]?.name || key;
+                div.innerHTML = `
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:${info.color}"></div>
+                <span>${info.name}: ${current}</span>
+              </div>
+              <button onclick="doUpgrade('${key}')" ${hasMat ? '' : 'disabled'}>
+                +1 (${info.per}${matName})
+              </button>
+            `;
+                list.appendChild(div);
+            }
+        }
+
+        function doUpgrade(mat) {
+            if (!selectedBuilding) return;
+            const info = TURRET_UPGRADES[mat];
+            if ((resources[mat] || 0) < info.per) return;
+            resources[mat] -= info.per;
+            selectedBuilding.upgrades = selectedBuilding.upgrades || {};
+            selectedBuilding.upgrades[mat] = (selectedBuilding.upgrades[mat] || 0) + 1;
+            renderUpgradeList();
+            showMsg(`⬆ ${info.name} +${info.step}`);
+            spawnParticle(selectedBuilding.x, selectedBuilding.y, info.color, 8);
+        }
+
+        function closeUpgrade() {
+            document.getElementById('upgradePanel').classList.remove('active');
+            selectedBuilding = null;
+        }
+
+        // ============================================================
+        //  UI 更 新
+        // ============================================================
+        function updateUI() {
+            document.getElementById('timeText').textContent = Math.ceil(phaseTimer);
+            document.getElementById('waveText').textContent = wave;
+            document.getElementById('enemyCount').textContent = enemies.length;
+            document.getElementById('hpBar').style.width = (campfire.hp / campfire.maxHp * 100) + '%';
+
+            const resBar = document.getElementById('resBar');
+            resBar.innerHTML = '';
+            const allRes = { ...resources };
+            for (const [key, val] of Object.entries(allRes)) {
+                if (val <= 0) continue;
+                const info = ORES[key] || MATERIALS[key] || { name: key, color: '#888' };
+                const div = document.createElement('div');
+                div.className = 'res-item';
+                div.innerHTML =
+                    `<div class="res-dot" style="background:${info.color}"></div>${info.name}:${Math.floor(val)}`;
+                resBar.appendChild(div);
+            }
+
+            const gatherBtn = document.getElementById('gatherBtn');
+            const upgradeBtn = document.getElementById('upgradeBtn');
+            const sellBtn = document.getElementById('sellBtn');
+
+            gatherBtn.style.display = nearestOre ? 'inline-block' : 'none';
+            upgradeBtn.style.display = (nearestBuilding && nearestBuilding.isTurret) ? 'inline-block' : 'none';
+            sellBtn.style.display = (nearestBuilding && nearestBuilding.type !== 'campfire') ? 'inline-block' : 'none';
+        }
+
+        // ============================================================
+        //  渲 染
+        // ============================================================
+        function render() {
+            ctx.fillStyle = phase === 'night' ? '#080812' : '#2d4a22';
+            ctx.fillRect(0, 0, W, H);
+
+            ctx.save();
+            ctx.translate(-camera.x, -camera.y);
+
+            renderGround();
+            renderOres();
+            renderCampfire();
+
+            for (const b of buildings) renderBuilding(b);
+            for (const e of enemies) renderEnemy(e);
+
+            // 投射物
+            for (const p of projectiles) {
+                ctx.fillStyle = p.color || '#ffeb3b';
+                ctx.shadowColor = p.color || '#ffeb3b';
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size || 4, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+
+            // 粒子
+            for (const p of particles) {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+            }
+            ctx.globalAlpha = 1;
+
+            // 伤害文字
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            for (const d of damageTexts) {
+                const size = d.size || 16;
+                ctx.font = `bold ${size}px sans-serif`;
+                ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+                ctx.lineWidth = 3;
+                ctx.strokeText(d.text, d.x, d.y);
+                ctx.fillStyle = '#ff4444';
+                ctx.fillText(d.text, d.x, d.y);
+            }
+
+            renderPlayer();
+
+            // 建造预览
+            if (buildMode) {
+                const mx = lastMouseWorldX || player.x;
+                const my = lastMouseWorldY || player.y;
+                const info = BUILDINGS[buildMode];
+                const size = info.size || 30;
+                const ok = canBuild(mx, my);
+                ctx.fillStyle = ok ? 'rgba(0,255,100,0.15)' : 'rgba(255,0,0,0.15)';
+                ctx.fillRect(mx - size / 2, my - size / 2, size, size);
+                ctx.strokeStyle = ok ? 'rgba(0,255,100,0.6)' : 'rgba(255,0,0,0.6)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.strokeRect(mx - size / 2, my - size / 2, size, size);
+                ctx.setLineDash([]);
+                // 范围圈
+                ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, CONFIG.BUILD_RANGE, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+        }
+
+        function renderGround() {
+            const startX = Math.floor(camera.x / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE;
+            const startY = Math.floor(camera.y / CONFIG.TILE_SIZE) * CONFIG.TILE_SIZE;
+            const endX = startX + W + CONFIG.TILE_SIZE;
+            const endY = startY + H + CONFIG.TILE_SIZE;
+            ctx.strokeStyle = phase === 'night' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+            ctx.lineWidth = 1;
+            for (let x = startX; x < endX; x += CONFIG.TILE_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+                ctx.stroke();
+            }
+            for (let y = startY; y < endY; y += CONFIG.TILE_SIZE) {
+                ctx.beginPath();
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+                ctx.stroke();
+            }
+        }
+
+        function renderOres() {
+            const pad = CONFIG.TILE_SIZE * 1.5;
+            const startX = Math.floor((camera.x - pad) / CONFIG.TILE_SIZE);
+            const endX = Math.floor((camera.x + W + pad) / CONFIG.TILE_SIZE);
+            const startY = Math.floor((camera.y - pad) / CONFIG.TILE_SIZE);
+            const endY = Math.floor((camera.y + H + pad) / CONFIG.TILE_SIZE);
+
+            for (let tx = startX; tx <= endX; tx++) {
+                for (let ty = startY; ty <= endY; ty++) {
+                    const vein = getOreVein(tx, ty);
+                    if (!vein || vein.amount <= 0) continue;
+                    const info = ORES[vein.type];
+                    if (!info) continue;
+                    const x = tx * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                    const y = ty * CONFIG.TILE_SIZE + CONFIG.TILE_SIZE / 2;
+                    // 大小随储量变化：4 ~ 14
+                    const ratio = vein.amount / vein.maxAmount;
+                    const radius = 4 + ratio * 10;
+                    ctx.fillStyle = info.color;
+                    ctx.shadowColor = info.color;
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    // 高亮（靠近玩家）
+                    if (nearestOre && Math.abs(nearestOre.x - x) < 2 && Math.abs(nearestOre.y - y) < 2) {
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 2;
+                        ctx.stroke();
+                        // 显示储量
+                        ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                        ctx.fillRect(x - 12, y - 24, 24, 14);
+                        ctx.fillStyle = '#fff';
+                        ctx.font = '9px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(vein.amount + '/' + vein.maxAmount, x, y - 17);
+                    }
+                }
+            }
+        }
+
+        function renderCampfire() {
+            const flicker = Math.sin(performance.now() / 120) * 3;
+            ctx.shadowColor = '#f39c12';
+            ctx.shadowBlur = 40;
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(campfire.x, campfire.y, 16 + flicker * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#f39c12';
+            ctx.beginPath();
+            ctx.arc(campfire.x, campfire.y - 4, 9 + flicker * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            const pct = campfire.hp / campfire.maxHp;
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(campfire.x - 22, campfire.y - 32, 44, 5);
+            ctx.fillStyle = pct > 0.5 ? '#2ecc71' : pct > 0.25 ? '#f39c12' : '#e74c3c';
+            ctx.fillRect(campfire.x - 22, campfire.y - 32, 44 * pct, 5);
+        }
+
+        function renderBuilding(b) {
+            const info = BUILDINGS[b.type];
+            if (!info) return;
+            const s = b.size || 30;
+            const x = b.x,
+                y = b.y;
+
+            // 背景
+            const grad = ctx.createRadialGradient(x, y, 0, x, y, s);
+            if (b.isTurret) {
+                grad.addColorStop(0, 'rgba(60,70,100,0.9)');
+                grad.addColorStop(1, 'rgba(30,35,55,0.9)');
+            } else if (b.factory) {
+                grad.addColorStop(0, 'rgba(70,60,40,0.9)');
+                grad.addColorStop(1, 'rgba(40,35,25,0.9)');
+            } else {
+                grad.addColorStop(0, 'rgba(50,50,70,0.85)');
+                grad.addColorStop(1, 'rgba(30,30,45,0.85)');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(x - s / 2, y - s / 2, s, s);
+            ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x - s / 2, y - s / 2, s, s);
+
+            // 图标
+            ctx.font = (s > 32 ? 22 : 18) + 'px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(info.icon, x, y + 1);
+
+            // 名称
+            ctx.fillStyle = 'rgba(255,255,255,0.4)';
+            ctx.font = '7px sans-serif';
+            ctx.fillText(info.name, x, y + s / 2 + 9);
+
+            // HP
+            const maxHp = info.hp || 100;
+            if (b.hp < maxHp) {
+                const pct = b.hp / maxHp;
+                ctx.fillStyle = 'rgba(0,0,0,0.6)';
+                ctx.fillRect(x - s / 2 + 2, y + s / 2 + 2, s - 4, 3);
+                ctx.fillStyle = '#e74c3c';
+                ctx.fillRect(x - s / 2 + 2, y + s / 2 + 2, (s - 4) * pct, 3);
+            }
+
+            // 选中
+            if (selectedBuilding === b) {
+                ctx.strokeStyle = '#f39c12';
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#f39c12';
+                ctx.shadowBlur = 10;
+                ctx.strokeRect(x - s / 2 - 2, y - s / 2 - 2, s + 4, s + 4);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function renderEnemy(e) {
+            const r = e.size;
+            // 身体
+            const color = e.burnTimer > 0 ? '#ff6600' : e.isElite ? '#9b59b6' : '#8e44ad';
+            ctx.shadowColor = e.isElite ? '#9b59b6' : '#8e44ad';
+            ctx.shadowBlur = e.isElite ? 20 : 10;
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(e.x, e.y, r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 眼睛
+            ctx.fillStyle = e.hitFlash > 0 ? '#ff0000' : '#c0392b';
+            ctx.beginPath();
+            ctx.arc(e.x - r * 0.3, e.y - r * 0.2, r * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(e.x + r * 0.3, e.y - r * 0.2, r * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 精英标记
+            if (e.isElite) {
+                ctx.strokeStyle = '#f1c40f';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(e.x, e.y, r + 4, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            // HP
+            const pct = e.hp / e.maxHp;
+            ctx.fillStyle = 'rgba(0,0,0,0.6)';
+            ctx.fillRect(e.x - r, e.y - r - 8, r * 2, 3);
+            ctx.fillStyle = pct > 0.5 ? '#2ecc71' : pct > 0.25 ? '#f39c12' : '#e74c3c';
+            ctx.fillRect(e.x - r, e.y - r - 8, r * 2 * pct, 3);
+        }
+
+        function renderPlayer() {
+            const p = player;
+            ctx.shadowColor = '#3498db';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#2980b9';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y - 3, p.size * 0.6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            // 采集范围
+            if (nearestOre) {
+                ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+                ctx.setLineDash([4, 6]);
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, CONFIG.INTERACT_RANGE, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+
+        // ============================================================
+        //  输 入 处 理
+        // ============================================================
+        function setupInputs() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+
+            canvas.addEventListener('pointerdown', e => {
+                const rect = canvas.getBoundingClientRect();
+                const cx = e.clientX - rect.left;
+                const cy = e.clientY - rect.top;
+                const wx = cx + camera.x;
+                const wy = cy + camera.y;
+                lastMouseWorldX = wx;
+                lastMouseWorldY = wy;
+
+                if (buildMode) {
+                    doBuild(wx, wy);
+                } else {
+                    // 选择建筑
+                    let found = null;
+                    for (const b of buildings) {
+                        if (dist(wx, wy, b.x, b.y) < (b.size || 30)) {
+                            found = b;
+                            break;
+                        }
+                    }
+                    if (found && found.isTurret) {
+                        selectedBuilding = found;
+                        toggleUpgradeMenu();
+                    } else {
+                        selectedBuilding = null;
+                        document.getElementById('upgradePanel').classList.remove('active');
+                    }
+                }
+            });
+
+            // 摇杆
+            const jz = document.getElementById('joystickZone');
+            const jbase = document.getElementById('joystickBase');
+            const jknob = document.getElementById('joystickKnob');
+
+            jz.addEventListener('pointerdown', e => {
+                joystick.active = true;
+                updateJoystick(e);
+                e.preventDefault();
+            });
+            window.addEventListener('pointermove', e => {
+                if (joystick.active) updateJoystick(e);
+            });
+            window.addEventListener('pointerup', () => {
+                joystick.active = false;
+                joystick.dx = 0;
+                joystick.dy = 0;
+                jknob.style.transform = 'translate(-50%, -50%)';
+            });
+
+            function updateJoystick(e) {
+                const rect = jbase.getBoundingClientRect();
+                const cx = rect.left + rect.width / 2;
+                const cy = rect.top + rect.height / 2;
+                let dx = e.clientX - cx;
+                let dy = e.clientY - cy;
+                const maxR = rect.width / 2 - 20;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d > maxR) { dx = (dx / d) * maxR;
+                    dy = (dy / d) * maxR; }
+                jknob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                joystick.dx = dx / maxR;
+                joystick.dy = dy / maxR;
+            }
+
+            // 键盘
+            window.addEventListener('keydown', e => {
+                const spd = player.speed * 2.2;
+                if (e.key === 'w' || e.key === 'ArrowUp') player.y -= spd;
+                if (e.key === 's' || e.key === 'ArrowDown') player.y += spd;
+                if (e.key === 'a' || e.key === 'ArrowLeft') player.x -= spd;
+                if (e.key === 'd' || e.key === 'ArrowRight') player.x += spd;
+                if (e.key === 'b' || e.key === 'B') toggleBuildMenu();
+                if (e.key === 'e' || e.key === 'E') doGather();
+                if (e.key === 'u' || e.key === 'U') toggleUpgradeMenu();
+                if (e.key === 'q' || e.key === 'Q') sellBuilding();
+            });
+
+            // 鼠标移动更新世界坐标
+            canvas.addEventListener('pointermove', e => {
+                const rect = canvas.getBoundingClientRect();
+                lastMouseWorldX = (e.clientX - rect.left) + camera.x;
+                lastMouseWorldY = (e.clientY - rect.top) + camera.y;
+            });
+        }
+
+        // ============================================================
+        //  初 始 化
+        // ============================================================
+        function startGame() {
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('joystickZone').style.display = 'block';
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            resize();
+            window.addEventListener('resize', resize);
+            setupInputs();
+
+            // 重置状态
+            campfire.x = 0;
+            campfire.y = 0;
+            player.x = 60;
+            player.y = 0;
+            buildings = [{ x: 0, y: 0, type: 'campfire', hp: CONFIG.CAMPFIRE_HP, size: 40, isTurret: false }];
+            enemies = [];
+            projectiles = [];
+            particles = [];
+            damageTexts = [];
+            oreVeins = new Map();
+            resources = {};
+            Object.keys(ORES).forEach(k => resources[k] = 30);
+            Object.keys(MATERIALS).forEach(k => resources[k] = 0);
+            wave = 1;
+            phase = 'day';
+            phaseTimer = CONFIG.DAY_DURATION;
+            totalEnemiesSpawned = 0;
+            spawnTimer = 0;
+            buildMode = null;
+            selectedBuilding = null;
+
+            gameRunning = true;
+            lastTime = performance.now();
+            showMsg('☀️ 白天，采集矿脉，建设防线！');
+            document.getElementById('phaseBadge').textContent = '☀️ 白天';
+            document.getElementById('phaseBadge').className = 'phase-badge phase-day';
+            requestAnimationFrame(loop);
+        }
+
+        function resize() {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W;
+            canvas.height = H;
+        }
+
+        // 页面加载完成
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+            resize();
+            // 预渲染
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, W, H);
+        };
+    </script>
+</body>
+</html>
